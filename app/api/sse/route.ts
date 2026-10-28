@@ -1,35 +1,26 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 
+const POLL_INTERVAL_MS = 2000;
+
+/** Streams unread message/notification counters to the header via Server-Sent Events. */
 export async function GET() {
   const session = await auth();
   if (!session?.user?.id) return new Response("Unauthorized", { status: 401 });
 
   const userId = session.user.id;
+  const encoder = new TextEncoder();
+  let interval: ReturnType<typeof setInterval> | undefined;
   let closed = false;
+
+  const stop = () => {
+    closed = true;
+    clearInterval(interval);
+  };
 
   const stream = new ReadableStream({
     async start(controller) {
-      const send = (data: object) => {
-        if (closed) return;
-        try {
-          controller.enqueue(`data: ${JSON.stringify(data)}\n\n`);
-        } catch {
-          closed = true;
-        }
-      };
-
-      const [messages, notifications] = await Promise.all([
-        prisma.message.count({ where: { receiverId: userId, read: false } }),
-        prisma.notification.count({ where: { userId, read: false } }),
-      ]);
-      send({ messages, notifications });
-
-      const interval = setInterval(async () => {
-        if (closed) {
-          clearInterval(interval);
-          return;
-        }
+      const push = async () => {
         try {
           const [messages, notifications] = await Promise.all([
             prisma.message.count({
@@ -37,18 +28,23 @@ export async function GET() {
             }),
             prisma.notification.count({ where: { userId, read: false } }),
           ]);
-          send({ messages, notifications });
+          if (closed) return;
+          controller.enqueue(
+            encoder.encode(
+              `data: ${JSON.stringify({ messages, notifications })}\n\n`,
+            ),
+          );
         } catch {
-          clearInterval(interval);
-          closed = true;
+          if (closed) return;
+          stop();
+          controller.close();
         }
-      }, 2000);
-
-      return () => {
-        closed = true;
-        clearInterval(interval);
       };
+
+      await push();
+      if (!closed) interval = setInterval(push, POLL_INTERVAL_MS);
     },
+    cancel: stop,
   });
 
   return new Response(stream, {

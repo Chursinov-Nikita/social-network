@@ -42,11 +42,9 @@ const CreateGroupModal = ({ onClose, onCreate }: Props) => {
     setLoading(true);
     try {
       await onCreate(name.trim(), selected);
-    } catch (error) {
-      console.error("Failed to create group", error);
-    } finally {
-      setLoading(false);
       onClose();
+    } catch {
+      setLoading(false);
     }
   };
 
@@ -63,7 +61,6 @@ const CreateGroupModal = ({ onClose, onCreate }: Props) => {
           {tr.newGroup}
         </p>
 
-        {/* Название */}
         <input
           type="text"
           value={name}
@@ -72,7 +69,6 @@ const CreateGroupModal = ({ onClose, onCreate }: Props) => {
           className="w-full rounded-xl border border-(--border) bg-(--bg-primary) px-3 py-2 text-sm text-(--text-primary) placeholder:text-(--text-primary)/25 outline-none focus:border-(--text-primary)/20 transition-colors"
         />
 
-        {/* Теги выбранных */}
         {selected.length > 0 && (
           <div className="flex flex-wrap gap-1.5">
             {selected.map((id) => {
@@ -93,7 +89,6 @@ const CreateGroupModal = ({ onClose, onCreate }: Props) => {
           </div>
         )}
 
-        {/* Поиск */}
         <input
           type="text"
           value={search}
@@ -102,7 +97,6 @@ const CreateGroupModal = ({ onClose, onCreate }: Props) => {
           className="w-full rounded-xl border border-(--border) bg-(--bg-primary) px-3 py-2 text-sm text-(--text-primary) placeholder:text-(--text-primary)/25 outline-none focus:border-(--text-primary)/20 transition-colors"
         />
 
-        {/* Список пользователей */}
         <div className="max-h-48 overflow-y-auto space-y-0.5 [scrollbar-width:thin]">
           {filtered.map((user) => (
             <button
@@ -137,7 +131,6 @@ const CreateGroupModal = ({ onClose, onCreate }: Props) => {
           ))}
         </div>
 
-        {/* Кнопки */}
         <div className="flex justify-end gap-2">
           <button
             onClick={onClose}

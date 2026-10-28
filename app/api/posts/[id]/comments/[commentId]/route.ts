@@ -1,4 +1,3 @@
-// app/api/posts/[id]/comments/[commentId]/route.ts
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 
@@ -12,9 +11,10 @@ export async function DELETE(
 
   const { commentId } = await params;
 
-  await prisma.comment.delete({
+  const { count } = await prisma.comment.deleteMany({
     where: { id: commentId, authorId: session.user.id },
   });
+  if (!count) return Response.json({ error: "Not found" }, { status: 404 });
 
   return Response.json({ ok: true });
 }

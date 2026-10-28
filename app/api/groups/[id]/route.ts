@@ -11,8 +11,8 @@ export async function GET(
 
   const { id } = await params;
 
-  const group = await prisma.groupChat.findUnique({
-    where: { id },
+  const group = await prisma.groupChat.findFirst({
+    where: { id, members: { some: { userId: session.user.id } } },
     include: {
       members: { include: { user: true } },
       messages: { orderBy: { createdAt: "desc" }, take: 1 },

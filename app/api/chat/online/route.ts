@@ -5,6 +5,10 @@ import { NextRequest } from "next/server";
 const ONLINE_THRESHOLD = 30000;
 
 export async function GET(req: NextRequest) {
+  const session = await auth();
+  if (!session?.user?.id)
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
+
   const ids =
     new URL(req.url).searchParams.get("ids")?.split(",").filter(Boolean) ?? [];
   if (!ids.length) return Response.json({});

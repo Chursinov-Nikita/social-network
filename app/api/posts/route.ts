@@ -2,10 +2,11 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { NextRequest } from "next/server";
 
+const PAGE_SIZE = 10;
+
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
-  const page = parseInt(searchParams.get("page") ?? "0");
-  const PAGE_SIZE = 10;
+  const page = Math.max(0, Number(searchParams.get("page")) || 0);
 
   const posts = await prisma.post.findMany({
     orderBy: { createdAt: "desc" },
@@ -15,7 +16,6 @@ export async function GET(req: NextRequest) {
       author: { select: { id: true, name: true, image: true } },
       likes: { select: { userId: true } },
       _count: { select: { comments: true } },
-      createdAt: { select: { createdAt: true } },
     },
   });
 

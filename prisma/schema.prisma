@@ -182,50 +182,43 @@ model Notification {
 
 enum ReelStatus {
   PROCESSING
-  READY
-  FAILED
+  PUBLISHED
+  DELETED
 }
 
 model Reel {
-  id        String      @id @default(cuid())
-  authorId  String
-  author    User        @relation(fields: [authorId], references: [id], onDelete: Cascade)
-  url360p   String?
-  url720p   String?
-  url1080p  String
-  thumbnail String?
-  duration  Int?
-  status    ReelStatus  @default(PROCESSING)
-  views     ReelView[]
-  likes     Like[]
-  comments  Comment[]
-  deletedAt DateTime?
-  createdAt DateTime    @default(now())
+  id String @id @default(cuid())
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  videoUrl String
+  thumbnailUrl String?
+  caption String?
+  status ReelStatus @default(PUBLISHED)
+  viewsCount Int @default(0)
+  createdAt DateTime @default(now())
+  likes Like[]
+  comments Comment[]
+  views ReelView[]
 
-  @@index([authorId])
-  @@index([authorId, createdAt])
+  @@index([userId])
   @@index([createdAt])
-  @@index([status])
-  @@index([deletedAt])
 }
 
 model ReelView {
-  id        String   @id @default(cuid())
-  reelId    String
-  userId    String?
-  ip        String?
-  reel      Reel     @relation(fields: [reelId], references: [id], onDelete: Cascade)
-  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  id String @id @default(cuid())
+  reelId String 
+  userId String
+  reel Reel @relation(fields: [reelId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
 
   @@unique([reelId, userId])
-  @@index([reelId])
 }
 
 model UserKey {
   id        String   @id @default(cuid())
   userId    String   @unique
-  publicKey String   // RSA публичный ключ
+  publicKey String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
 }

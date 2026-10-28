@@ -1,19 +1,29 @@
 import { auth } from "@/auth";
 import { NextResponse } from "next/server";
 
-export default auth((req) => {
-  const isLoggedIn = !!req.auth;
-  const isAuthPage = req.nextUrl.pathname.startsWith("/login");
+const AUTH_PAGES = ["/login", "/register"];
 
-  if (!isLoggedIn && !isAuthPage) {
-    return NextResponse.redirect(new URL("/login", req.url));
+export default auth((req) => {
+  const { pathname } = req.nextUrl;
+  const isLoggedIn = !!req.auth;
+  const isAuthPage = AUTH_PAGES.includes(pathname);
+
+  if (isAuthPage && isLoggedIn) {
+    return NextResponse.redirect(new URL("/", req.url));
   }
 
-  if (isLoggedIn && isAuthPage) {
-    return NextResponse.redirect(new URL("/feed", req.url));
+  if (!isAuthPage && !isLoggedIn) {
+    return NextResponse.redirect(new URL("/login", req.url));
   }
 });
 
 export const config = {
-  matcher: ["/feed/:path*", "/login"],
+  matcher: [
+    "/login",
+    "/register",
+    "/chat/:path*",
+    "/friends/:path*",
+    "/notifications/:path*",
+    "/profile/:path*",
+  ],
 };

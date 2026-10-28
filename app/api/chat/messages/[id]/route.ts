@@ -10,10 +10,10 @@ export async function DELETE(
     return Response.json({ error: "Unauthorized" }, { status: 401 });
 
   const { id } = await params;
-
-  await prisma.message.delete({
+  const { count } = await prisma.message.deleteMany({
     where: { id, senderId: session.user.id },
   });
+  if (!count) return Response.json({ error: "Not found" }, { status: 404 });
 
   return Response.json({ ok: true });
 }

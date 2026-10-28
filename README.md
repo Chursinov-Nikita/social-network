@@ -1,36 +1,74 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# NEBL — социальная сеть
 
-## Getting Started
+Full-stack социальная сеть на **Next.js 16 (App Router)**, **React 19**, **TypeScript**, **Prisma** и **PostgreSQL**: лента постов, короткие видео (рилсы), личные и групповые чаты, друзья и уведомления. Интерфейс на двух языках (RU / EN) со светлой и тёмной темой.
 
-First, run the development server:
+## Возможности
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+- **Аутентификация** — email + пароль (bcrypt) и OAuth через Google и GitHub (Auth.js v5, JWT-сессии). Приватные страницы закрыты на уровне `proxy.ts`.
+- **Лента** — посты с текстом и фото, лайки, комментарии, удаление своих постов, догрузка по страницам. Фото сжимаются в браузере (canvas) перед загрузкой.
+- **Рилсы** — вертикальная лента видео с автовоспроизведением в зоне видимости (IntersectionObserver), лайки, загрузка своих видео, просмотры считаются один раз на пользователя.
+- **Чаты**
+  - личные сообщения: статус «в сети / был(а) в…», поиск по переписке, закреплённые сообщения, удаление сообщений и очистка чата;
+  - групповые чаты с ролями владельца и участника, голосовые сообщения (MediaRecorder);
+  - папки для чатов, фильтр непрочитанных, счётчики непрочитанных.
+- **Друзья** — поиск людей, заявки в друзья, принятие/отклонение, удаление из друзей.
+- **Уведомления** — о лайках, комментариях и заявках в друзья; счётчики в шапке обновляются в реальном времени через **Server-Sent Events**.
+- **Профиль** — смена аватара и никнейма, статистика, публичные профили пользователей.
+
+## Стек
+
+| Слой          | Технологии                                                               |
+| ------------- | ------------------------------------------------------------------------ |
+| Frontend      | Next.js 16, React 19, TypeScript, Tailwind CSS 4, lucide-react, date-fns |
+| Backend       | Next.js Route Handlers, Auth.js (next-auth v5), Server-Sent Events       |
+| База данных   | PostgreSQL, Prisma ORM (миграции в `prisma/migrations`)                  |
+| Качество кода | ESLint (next/core-web-vitals + TypeScript), Prettier, строгий `tsc`      |
+
+## Технические решения
+
+- **Оптимистичные обновления** — лайки, комментарии и сообщения появляются сразу и откатываются, если запрос не прошёл.
+- **Пагинация** — курсорная для сообщений и рилсов, постраничная для ленты. Фоновый опрос чата обновляет только последнюю страницу и не сбрасывает уже загруженную историю.
+- **Проверка доступа на сервере** — изменяющие данные роуты проверяют сессию и права на ресурс (посты, комментарии, папки, групповые чаты).
+- **Загрузка файлов** — общий хелпер `lib/upload.ts` проверяет MIME-тип и размер и генерирует имя файла на сервере.
+- **i18n и тема без ошибок гидрации** — язык и тема хранятся в `localStorage` и читаются через `useSyncExternalStore` (`app/hooks/useStoredValue.tsx`).
+
+## Структура проекта
+
+```
+app/
+  api/            REST-эндпоинты (Route Handlers)
+  components/     переиспользуемые компоненты: chat, feed, header, profile
+  hooks/          клиентские хуки (тема, язык, онлайн-статус, счётчики)
+  translation/    словари RU / EN
+  types/          общие TypeScript-типы
+  chat/ friends/ notifications/ profile/ reels/ about/ login/ register/   страницы
+lib/              Prisma client, загрузка файлов
+prisma/           схема и миграции БД
+auth.ts           конфигурация Auth.js
+proxy.ts          защита приватных маршрутов
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Запуск локально
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Нужны Node.js 20+ и PostgreSQL.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm install
+cp .env.example .env        # заполните DATABASE_URL и AUTH_SECRET
+npx prisma migrate dev      # создаёт таблицы
+npm run dev                 # http://localhost:3000
+```
 
-## Learn More
+OAuth-ключи Google и GitHub нужны только для входа через эти сервисы; регистрация по email работает без них.
 
-To learn more about Next.js, take a look at the following resources:
+## Скрипты
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+| Команда                       | Что делает                |
+| ----------------------------- | ------------------------- |
+| `npm run dev`                 | dev-сервер                |
+| `npm run build` / `npm start` | продакшн-сборка и запуск  |
+| `npm run lint`                | ESLint                    |
+| `npm run typecheck`           | проверка типов TypeScript |
+| `npm run format`              | форматирование Prettier   |
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+> Загруженные файлы хранятся в `public/uploads` (исключены из git). Для продакшн-деплоя на serverless-хостинге их стоит перенести в объектное хранилище (S3, Vercel Blob и т. п.).

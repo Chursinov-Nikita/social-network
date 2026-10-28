@@ -8,14 +8,14 @@ export async function DELETE(req: NextRequest) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
 
   const { recipientId, mode } = await req.json();
+  if (!recipientId || (mode !== "mine" && mode !== "all"))
+    return Response.json({ error: "Invalid request" }, { status: 400 });
 
   if (mode === "mine") {
-    // Только мои сообщения
     await prisma.message.deleteMany({
       where: { senderId: session.user.id, receiverId: recipientId },
     });
-  } else if (mode === "all") {
-    // Все сообщения в чате
+  } else {
     await prisma.message.deleteMany({
       where: {
         OR: [

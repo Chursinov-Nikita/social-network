@@ -1,9 +1,14 @@
+export const PAGE_SIZE = 50;
+
+export type MessageType = "text" | "audio";
+
 export type Message = {
   id: string;
   senderId: string;
   receiverId?: string | null;
   groupId?: string | null;
   content: string;
+  type: MessageType;
   read: boolean;
   createdAt: string;
   pinned: boolean;
@@ -24,6 +29,7 @@ export type ChatUser = {
 
 export type MessagePreview = {
   content: string;
+  type: string;
   createdAt: string;
   senderId: string;
   receiverId: string;
@@ -43,8 +49,7 @@ export type GroupChat = {
   createdBy: string;
   createdAt: string;
   members: GroupMember[];
-  messages?: MessageWithType[];
-  audioMessages?: Message[];
+  messages?: Message[];
 };
 
 export type GroupMember = {
@@ -53,17 +58,4 @@ export type GroupMember = {
   user: ChatUser;
 };
 
-export type ChatItem =
-  | { type: "dm"; user: ChatUser; preview?: MessagePreview }
-  | { type: "group"; group: GroupChat; preview?: MessagePreview };
-
-export type Props = {
-  onSelect: (user: ChatUser) => void;
-  selected: ChatUser | null;
-};
-
 export type DeleteMode = "mine" | "all" | "chat" | null;
-
-export type MessageWithType = Message & { type: "text" | "audio" };
-
-export const PAGE_SIZE = 50;

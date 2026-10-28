@@ -12,6 +12,14 @@ export async function POST(
 
   const { id } = await params;
   const { companionId } = await req.json();
+  if (!companionId)
+    return Response.json({ error: "Invalid request" }, { status: 400 });
+
+  const folder = await prisma.chatFolder.findFirst({
+    where: { id, userId: session.user.id },
+    select: { id: true },
+  });
+  if (!folder) return Response.json({ error: "Not found" }, { status: 404 });
 
   const existing = await prisma.chatFolderMember.findFirst({
     where: { folderId: id, companionId },

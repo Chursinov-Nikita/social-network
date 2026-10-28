@@ -41,7 +41,6 @@ export async function DELETE(
     where: { groupId_userId: { groupId: id, userId: session.user.id } },
   });
 
-  // owner удаляет кого угодно, участник только себя
   if (me?.role !== "owner" && userId !== session.user.id)
     return Response.json({ error: "Forbidden" }, { status: 403 });
 

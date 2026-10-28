@@ -1,8 +1,7 @@
+import type { Translation } from "@/app/translation/translation";
+
 export type NotificationType =
-  | "like"
-  | "comment"
-  | "friend_request"
-  | "friend_accepted";
+  "like" | "comment" | "friend_request" | "friend_accepted";
 
 export type Notification = {
   id: string;
@@ -13,18 +12,11 @@ export type Notification = {
   senderId: string | null;
   sender: { id: string; name: string | null; image: string | null } | null;
   createdAt: string;
+  friendshipId: string | null;
 };
 
-export const typeLabel = (
-  type: string,
-  tr: {
-    notifLike: string;
-    notifComment: string;
-    notifFriendRequest: string;
-    notifFriendAccepted: string;
-  },
-) => {
-  switch (type) {
+export const typeLabel = (type: string, tr: Translation) => {
+  switch (type as NotificationType) {
     case "like":
       return tr.notifLike;
     case "comment":
@@ -34,6 +26,6 @@ export const typeLabel = (
     case "friend_accepted":
       return tr.notifFriendAccepted;
     default:
-      return "";
+      return null;
   }
 };

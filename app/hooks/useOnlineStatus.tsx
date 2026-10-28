@@ -6,25 +6,29 @@ type OnlineData = {
   lastSeen: string | null;
 };
 
+const PING_INTERVAL_MS = 20_000;
+const STATUS_INTERVAL_MS = 15_000;
+
 export const useOnlineStatus = (userIds: string[]) => {
   const { data: session } = useSession();
   const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
   const [lastSeen, setLastSeen] = useState<Record<string, string>>({});
+  const idsKey = userIds.join(",");
 
   useEffect(() => {
     if (!session?.user?.id) return;
 
     const ping = () => fetch("/api/chat/online", { method: "POST" });
     void ping();
-    const interval = setInterval(ping, 20000);
+    const interval = setInterval(ping, PING_INTERVAL_MS);
     return () => clearInterval(interval);
   }, [session?.user?.id]);
 
   useEffect(() => {
-    if (!userIds.length) return;
+    if (!idsKey) return;
 
     const fetchStatus = async () => {
-      const res = await fetch(`/api/chat/online?ids=${userIds.join(",")}`);
+      const res = await fetch(`/api/chat/online?ids=${idsKey}`);
       if (!res.ok) return;
       const data: Record<string, OnlineData> = await res.json();
 
@@ -41,9 +45,9 @@ export const useOnlineStatus = (userIds: string[]) => {
     };
 
     void fetchStatus();
-    const interval = setInterval(fetchStatus, 15000);
+    const interval = setInterval(fetchStatus, STATUS_INTERVAL_MS);
     return () => clearInterval(interval);
-  }, [userIds.join(",")]);
+  }, [idsKey]);
 
   return { onlineUsers, lastSeen };
 };

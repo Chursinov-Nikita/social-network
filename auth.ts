@@ -27,8 +27,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null;
 
-        const user = await prisma.user.findUnique({
-          where: { email: credentials.email as string },
+        const user = await prisma.user.findFirst({
+          where: {
+            email: { equals: credentials.email as string, mode: "insensitive" },
+          },
         });
 
         if (!user || !user.password) return null;
@@ -40,7 +42,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
         if (!isValid) return null;
 
-        return user;
+        return {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          image: user.image,
+        };
       },
     }),
   ],
@@ -50,9 +57,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.id = user.id;
         token.picture = user.image;
       }
-      // Обновляем аватар при вызове update()
+      // The profile page calls `update({ image })` after an avatar upload.
       if (trigger === "update" && session?.image) {
         token.picture = session.image;
+      }
+      if (trigger === "update" && session?.name) {
+        token.name = session.name;
       }
       return token;
     },
@@ -63,7 +73,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     },
   },
   pages: {
-    signIn: "/components/login",
-    error: "/components/login",
+    signIn: "/login",
+    error: "/login",
   },
 });

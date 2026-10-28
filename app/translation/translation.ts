@@ -90,10 +90,9 @@ export const t = {
     noMoreVideos: "No more videos",
     collapse: "collapse",
     more: "more",
-    anonymous: "anonymous",
+    anonymous: "Anonymous",
 
     // Chat
-    chat: "Chats",
     clickToChat: "Click to chat",
     writeMessage: "Message",
     loadOlderMessages: "Load older messages",
@@ -208,13 +207,13 @@ export const t = {
     joinUs: "Join Us",
     featureChat: "Real-time Chat",
     featureChatDesc:
-      "Instant messaging with friends and groups, with read receipts and media sharing.",
+      "Direct and group chats with read receipts, pinned messages, and voice messages.",
     featurePhoto: "Photo Sharing",
     featurePhotoDesc:
       "Post and discover amazing photos from people around the world.",
     featurePrivacy: "Privacy First",
     featurePrivacyDesc:
-      "Your data is encrypted and you control who sees your content.",
+      "Secure authentication, hashed passwords, and access checks on every request.",
     valueRespect: "Respect",
     valueRespectDesc: "We foster a respectful environment for everyone.",
     valueInnovation: "Innovation",
@@ -224,6 +223,27 @@ export const t = {
       "A platform for all cultures, languages, and backgrounds.",
     valueSimplicity: "Simplicity",
     valueSimplicityDesc: "Easy to use, intuitive design for all ages.",
+
+    // Misc
+    loginError: "Invalid email or password",
+    emailTaken: "This email is already registered",
+    registerFailed: "Registration failed. Please try again.",
+    nothingFound: "Nothing found",
+    voiceMessage: "Voice message",
+    noMessages: "No messages yet",
+    offline: "offline",
+    confirmDeleteFolder: "Confirm deletion",
+    deleteFolderTitle: "Delete folder",
+    membersCount: (n: number) => `${n} ${n === 1 ? "member" : "members"}`,
+    leaveGroup: "Leave group",
+    deleteGroup: "Delete group",
+    memberSince: "Member since",
+    loadingReels: "Loading reels...",
+    deleteReelConfirm: "Delete this reel permanently?",
+    uploadReelFailed: "Couldn't upload the reel. Please try again.",
+    postImageAlt: "Post image",
+    avatarUploadFailed: "Couldn't upload the avatar",
+    genericError: "Something went wrong. Please try again.",
 
     // Logout
     logOut: "Sign Out",
@@ -245,7 +265,7 @@ export const t = {
     loadMore: "Загрузить ещё",
     loadingDots: "Загрузка...",
     noMorePosts: "Постов больше нет",
-    whatsOnYourMind: "Что расскажите?",
+    whatsOnYourMind: "Что у вас нового?",
     post: "Опубликовать",
     posting: "Публикация...",
     photo: "Фото",
@@ -322,8 +342,7 @@ export const t = {
     anonymous: "Аноним",
 
     // Chat
-    chat: "Chats",
-    clickToChat: "Нажмите для чата",
+    clickToChat: "Нажмите, чтобы начать чат",
     writeMessage: "Сообщение",
     loadOlderMessages: "Загрузить старые сообщения",
     online: "онлайн",
@@ -372,9 +391,9 @@ export const t = {
     creating: "Создание...",
     confirmPassword: "Подтвердите пароль",
     passwordsDoNotMatch: "Пароли не совпадают",
-    passwordLeast: "Пароль должен быть более 6 символов",
+    passwordLeast: "Пароль должен содержать не менее 6 символов",
     name: "Имя",
-    name2: "твое имя",
+    name2: "ваше имя",
     noAccount: "Нет аккаунта?",
     register: "Зарегистрироваться",
     haveAccount: "Есть аккаунт?",
@@ -431,17 +450,17 @@ export const t = {
       "Соединять людей по всему миру, предоставляя безопасную и удобную платформу для общения, обмена идеями и творчества. Мы верим, что технологии должны служить людям, а не разделять их.",
     featuresTitle: "Возможности",
     valuesTitle: "Ценности",
-    ready: "Вы Готовы?",
+    ready: "Готовы?",
     joinUs: "Присоединиться",
     featureChat: "Чат в реальном времени",
     featureChatDesc:
-      "Мгновенные сообщения с друзьями и группами, с уведомлениями о прочтении и медиафайлами.",
+      "Личные и групповые чаты с отметками о прочтении, закреплёнными и голосовыми сообщениями.",
     featurePhoto: "Обмен фото",
     featurePhotoDesc:
       "Публикуйте и открывайте для себя удивительные фотографии со всего мира.",
     featurePrivacy: "Приватность прежде всего",
     featurePrivacyDesc:
-      "Ваши данные зашифрованы, и вы контролируете кто видит ваш контент.",
+      "Надёжная авторизация, хешированные пароли и проверка доступа в каждом запросе.",
     valueRespect: "Уважение",
     valueRespectDesc: "Мы строим сообщество, в котором комфортно и уютно всем.",
     valueInnovation: "Инновации",
@@ -452,6 +471,37 @@ export const t = {
     valueSimplicity: "Простота",
     valueSimplicityDesc:
       "Удобный и интуитивно понятный дизайн для всех возрастов.",
+
+    // Misc
+    loginError: "Неверный email или пароль",
+    emailTaken: "Этот email уже зарегистрирован",
+    registerFailed: "Не удалось зарегистрироваться. Попробуйте ещё раз.",
+    nothingFound: "Ничего не найдено",
+    voiceMessage: "Голосовое сообщение",
+    noMessages: "Сообщений пока нет",
+    offline: "не в сети",
+    confirmDeleteFolder: "Подтвердить удаление",
+    deleteFolderTitle: "Удалить папку",
+    membersCount: (n: number) => {
+      const mod10 = n % 10;
+      const mod100 = n % 100;
+      const word =
+        mod10 === 1 && mod100 !== 11
+          ? "участник"
+          : mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)
+            ? "участника"
+            : "участников";
+      return `${n} ${word}`;
+    },
+    leaveGroup: "Выйти из группы",
+    deleteGroup: "Удалить группу",
+    memberSince: "С нами с",
+    loadingReels: "Загрузка рилсов...",
+    deleteReelConfirm: "Удалить рилс без возможности восстановления?",
+    uploadReelFailed: "Не удалось загрузить рилс. Попробуйте ещё раз.",
+    postImageAlt: "Изображение поста",
+    avatarUploadFailed: "Не удалось загрузить аватар",
+    genericError: "Что-то пошло не так. Попробуйте ещё раз.",
 
     // Logout
     logOut: "Выйти",

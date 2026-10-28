@@ -24,15 +24,19 @@ const Feed = ({ initialPosts = [] }: { initialPosts: Post[] }) => {
   const loadMore = async () => {
     if (loading || !hasMore) return;
     setLoading(true);
-    const res = await fetch(`/api/posts?page=${page}`);
-    const newPosts: Post[] = await res.json();
-    setPosts((prev) => {
-      const ids = new Set(prev.map((p) => p.id));
-      return [...prev, ...newPosts.filter((p) => !ids.has(p.id))];
-    });
-    setPage((p) => p + 1);
-    if (newPosts.length < PAGE_SIZE) setHasMore(false);
-    setLoading(false);
+    try {
+      const res = await fetch(`/api/posts?page=${page}`);
+      if (!res.ok) throw new Error("Failed to load posts");
+      const newPosts: Post[] = await res.json();
+      setPosts((prev) => {
+        const ids = new Set(prev.map((p) => p.id));
+        return [...prev, ...newPosts.filter((p) => !ids.has(p.id))];
+      });
+      setPage((p) => p + 1);
+      if (newPosts.length < PAGE_SIZE) setHasMore(false);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

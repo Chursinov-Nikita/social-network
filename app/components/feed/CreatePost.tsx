@@ -113,6 +113,7 @@ const CreatePost = ({
     if (!content.trim() && !image) return;
     if (!session?.user?.id) return;
     setLoading(true);
+    setImageError(null);
 
     try {
       let imageUrl: string | null = null;
@@ -124,22 +125,22 @@ const CreatePost = ({
           method: "POST",
           body: formData,
         });
-        const data = await res.json();
-        imageUrl = data.url;
+        if (!res.ok) throw new Error("Upload failed");
+        imageUrl = (await res.json()).url;
       }
 
       const res = await fetch("/api/posts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content, imageUrl }),
+        body: JSON.stringify({ content: content.trim(), imageUrl }),
       });
+      if (!res.ok) throw new Error("Post creation failed");
 
-      const newPost = await res.json();
-      onPostCreated?.(newPost);
+      onPostCreated?.(await res.json());
       setContent("");
       removeImage();
-    } catch (err) {
-      console.error("Ошибка публикации:", err);
+    } catch {
+      setImageError(tr.uploadFailed);
     } finally {
       setLoading(false);
     }

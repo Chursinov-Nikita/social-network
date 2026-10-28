@@ -8,26 +8,22 @@ import type {
   Folder,
   GroupChat,
   MessagePreview,
-  Props,
 } from "@/app/types/chat";
-import { decryptPreview } from "@/lib/e2ee";
 import { Check, Loader2, Plus, Search, Users, X } from "lucide-react";
 import { useSession } from "next-auth/react";
 import Image from "next/image";
-import {
-  startTransition,
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+import { useEffect, useRef, useState } from "react";
 import CreateGroupModal from "./CreateGroupModal";
 import CreateFolderModal from "./CreateFolderModal";
 
-const UserList = ({
-  onSelect,
-  selected,
-}: Props & { onGroupLeft?: () => void }) => {
+const POLL_INTERVAL_MS = 5000;
+
+type UserListProps = {
+  onSelect: (user: ChatUser) => void;
+  selected: ChatUser | null;
+};
+
+const UserList = ({ onSelect, selected }: UserListProps) => {
   const { data: session } = useSession();
   const { lang } = useLang();
   const tr = t[lang];
@@ -46,9 +42,6 @@ const UserList = ({
   );
   const [groups, setGroups] = useState<GroupChat[]>([]);
   const [isCreatingGroup, setIsCreatingGroup] = useState(false);
-  const [decryptedPreviews, setDecryptedPreviews] = useState<
-    Record<string, string>
-  >({});
   const [searchQuery, setSearchQuery] = useState("");
   const menuRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -56,53 +49,31 @@ const UserList = ({
   const userIds = users.map((u) => u.id);
   const { onlineUsers } = useOnlineStatus(userIds);
 
-  const loadPreviews = useCallback(async () => {
-    const res = await fetch("/api/chat/previews");
-    const data = await res.json();
-    setPreviews(data.previews ?? {});
-    setUnread(data.unread ?? {});
-  }, []);
-
-  const loadGroups = useCallback(async () => {
-    const res = await fetch("/api/groups");
-    if (!res.ok) return;
-    const data = await res.json();
-    setGroups(Array.isArray(data) ? data : []);
-  }, []);
-
-  useEffect(() => {
-    if (!session?.user?.id || !Object.keys(previews).length) return;
-    (async () => {
-      const result: Record<string, string> = {};
-      await Promise.all(
-        Object.entries(previews).map(async ([userId, preview]) => {
-          result[userId] = await decryptPreview(
-            preview.content,
-            preview.senderId,
-            session?.user?.id || "",
-            userId,
-          );
-        }),
-      );
-      setDecryptedPreviews(result);
-    })();
-  }, [previews, session?.user?.id]);
-
   useEffect(() => {
     if (!session?.user?.id) return;
-    startTransition(() => {
-      fetch("/api/chat/users")
+
+    const refresh = () => {
+      fetch("/api/chat/previews")
         .then((r) => r.json())
-        .then(setUsers);
-    });
-    void loadPreviews();
-    void loadGroups();
-    const interval = setInterval(() => {
-      void loadPreviews();
-      void loadGroups();
-    }, 5000);
+        .then((data) => {
+          setPreviews(data.previews ?? {});
+          setUnread(data.unread ?? {});
+        });
+      fetch("/api/groups")
+        .then((r) => (r.ok ? r.json() : []))
+        .then((data) => setGroups(Array.isArray(data) ? data : []));
+    };
+
+    fetch("/api/chat/users")
+      .then((r) => r.json())
+      .then(setUsers);
+    fetch("/api/chat/folders")
+      .then((r) => r.json())
+      .then(setFolders);
+    refresh();
+    const interval = setInterval(refresh, POLL_INTERVAL_MS);
     return () => clearInterval(interval);
-  }, [session?.user?.id, loadPreviews, loadGroups]);
+  }, [session?.user?.id]);
 
   useEffect(() => {
     if (!folderMenuUser) return;
@@ -182,11 +153,9 @@ const UserList = ({
   const filteredUsers = q
     ? folderFiltered.filter((u) => {
         const nameMatch = (u.name ?? "").toLowerCase().includes(q);
-        const preview = decryptedPreviews[u.id] ?? "";
+        const preview = previews[u.id];
         const msgMatch =
-          !preview.startsWith("data:audio/") &&
-          !preview.startsWith("blob:") &&
-          preview.toLowerCase().includes(q);
+          preview?.type === "text" && preview.content.toLowerCase().includes(q);
         return nameMatch || msgMatch;
       })
     : folderFiltered;
@@ -223,27 +192,22 @@ const UserList = ({
       : date.toLocaleDateString(lang, { day: "numeric", month: "short" });
   };
 
-  const isAudioPreview = (text: string) =>
-    text.startsWith("data:audio/") || text.startsWith("blob:");
-
   const formatPreview = (userId: string) => {
     const preview = previews[userId];
-    const decrypted = decryptedPreviews[userId];
     if (!preview) return tr.clickToChat;
-    if (!decrypted) return "🔒";
-    if (isAudioPreview(decrypted)) return "Голосовое сообщение";
-    return decrypted;
+    if (preview.type === "audio") return tr.voiceMessage;
+    return preview.content;
   };
 
   const formatGroupPreview = (g: GroupChat) => {
     const lastMsg = g.messages?.[0];
-    if (!lastMsg) return "Нет сообщений";
-    if (lastMsg.type === "audio") return "Голосовое сообщение";
-    return lastMsg.content?.slice(0, 40) ?? "";
+    if (!lastMsg) return tr.noMessages;
+    if (lastMsg.type === "audio") return tr.voiceMessage;
+    return lastMsg.content.slice(0, 40);
   };
 
   const highlight = (text: string) => {
-    if (!q || text === "Голосовое сообщение" || text === "🔒") return text;
+    if (!q || text === tr.voiceMessage) return text;
     const idx = text.toLowerCase().indexOf(q);
     if (idx === -1) return text;
     return (
@@ -332,8 +296,8 @@ const UserList = ({
               }`}
               title={
                 confirmDeleteFolder === folder.id
-                  ? "Подтвердить удаление"
-                  : "Удалить папку"
+                  ? tr.confirmDeleteFolder
+                  : tr.deleteFolderTitle
               }
             >
               {deletingFolder === folder.id ? (
@@ -369,7 +333,7 @@ const UserList = ({
             if (item.type === "group") {
               const g = item.g;
               const preview = formatGroupPreview(g);
-              const isAudioPreviewGroup = preview === "Голосовое сообщение";
+              const isAudioPreviewGroup = preview === tr.voiceMessage;
               return (
                 <div
                   key={g.id}
@@ -439,7 +403,7 @@ const UserList = ({
             const u = item.u;
             const isOnline = onlineUsers.has(u.id);
             const previewText = formatPreview(u.id);
-            const isAudio = previewText === "Голосовое сообщение";
+            const isAudio = previews[u.id]?.type === "audio";
             const isOwn = previews[u.id]?.senderId === session?.user?.id;
 
             return (
@@ -490,7 +454,9 @@ const UserList = ({
                           className={`text-xs truncate mt-0.5 ${(unread[u.id] ?? 0) > 0 ? "text-(--text-primary)/60 font-medium" : "text-(--text-primary)/30"} ${isAudio ? "italic" : ""}`}
                         >
                           {isOwn ? (
-                            <>Вы: {highlight(previewText)}</>
+                            <>
+                              {tr.you}: {highlight(previewText)}
+                            </>
                           ) : (
                             highlight(previewText)
                           )}

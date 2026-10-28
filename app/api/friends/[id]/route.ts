@@ -23,6 +23,15 @@ export async function PATCH(
     data: { status: "accepted" },
   });
 
+  await prisma.notification.create({
+    data: {
+      userId: friendship.senderId,
+      type: "friend_accepted",
+      content: `${session.user.name ?? "Someone"} accepted your friend request`,
+      senderId: session.user.id,
+    },
+  });
+
   return Response.json(updated);
 }
 

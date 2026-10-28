@@ -1,17 +1,10 @@
-export type ReelAuthor = {
-  id: string;
-  name: string | null;
-  image: string | null;
-};
-
 export type Reel = {
   id: string;
-  url1080p: string;
-  thumbnail: string | null;
-  views: number;
-  authorId: string;
-  author: ReelAuthor;
-  likes: { userId: string }[];
-  _count: { comments: number };
-  createdAt: string;
+  videoUrl: string;
+  thumbnailUrl: string | null;
+  caption: string | null;
+  user: { id: string; name: string | null; image: string | null };
+  likesCount: number;
+  commentsCount: number;
+  isLiked: boolean;
 };

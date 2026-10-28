@@ -3,8 +3,12 @@
 import { useLang } from "@/app/context/language";
 import { useOnlineStatus } from "@/app/hooks/useOnlineStatus";
 import { t } from "@/app/translation/translation";
-import type { ChatUser } from "@/app/types/chat";
-import { DeleteMode, MessageWithType, PAGE_SIZE } from "@/app/types/chat";
+import {
+  PAGE_SIZE,
+  type ChatUser,
+  type DeleteMode,
+  type Message,
+} from "@/app/types/chat";
 import {
   ChevronDown,
   ChevronUp,
@@ -21,14 +25,11 @@ import {
 import { useSession } from "next-auth/react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import {
-  startTransition,
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { EMOJI_CATEGORIES } from "./emoji";
+import { mergeLatestPage } from "./mergeLatestPage";
+
+const POLL_INTERVAL_MS = 5000;
 
 const useClickOutside = (
   ref: React.RefObject<HTMLElement | null>,
@@ -58,12 +59,8 @@ const ChatWindow = ({
   const currentUserId = session?.user?.id;
   const router = useRouter();
 
-  const [messages, setMessages] = useState<MessageWithType[]>([]);
-  const [decryptedMessages, setDecryptedMessages] = useState<MessageWithType[]>(
-    [],
-  );
+  const [messages, setMessages] = useState<Message[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<string[]>([]);
   const [currentSearchIndex, setCurrentSearchIndex] = useState(0);
   const [content, setContent] = useState("");
   const [hasMore, setHasMore] = useState(true);
@@ -87,24 +84,28 @@ const ChatWindow = ({
   const inputMenuRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const emojiRef = useRef<HTMLDivElement>(null);
+  const lastMessageIdRef = useRef<string | null>(null);
 
   const { onlineUsers, lastSeen } = useOnlineStatus([recipient.id]);
   const isOnline = onlineUsers.has(recipient.id);
 
+  const closeSearch = () => {
+    setShowInputMenu(false);
+    setSearchQuery("");
+    setCurrentSearchIndex(0);
+  };
+
   useClickOutside(menuRef, () => setShowMenu(false), showMenu);
-  useClickOutside(inputMenuRef, () => setShowInputMenu(false), showInputMenu);
+  useClickOutside(inputMenuRef, closeSearch, showInputMenu);
   useClickOutside(emojiRef, () => setShowEmoji(false), showEmoji);
 
   useEffect(() => {
     if (!currentUserId) return;
-    startTransition(() => {
-      setMessages([]);
-      setDecryptedMessages([]);
-      setHasMore(true);
-    });
-    fetch(`/api/chat/messages?recipientId=${recipient.id}`)
+    const url = `/api/chat/messages?recipientId=${recipient.id}`;
+
+    fetch(url)
       .then((r) => r.json())
-      .then((data: MessageWithType[]) => {
+      .then((data: Message[]) => {
         setMessages(data);
         setHasMore(data.length === PAGE_SIZE);
       });
@@ -113,60 +114,40 @@ const ChatWindow = ({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ senderId: recipient.id }),
     });
-  }, [recipient.id, currentUserId]);
 
-  useEffect(() => {
-    if (!currentUserId) return;
     const interval = setInterval(async () => {
-      const res = await fetch(`/api/chat/messages?recipientId=${recipient.id}`);
-      const data: MessageWithType[] = await res.json();
-      setMessages(data);
-    }, 5000);
+      const res = await fetch(url);
+      if (!res.ok) return;
+      const latest: Message[] = await res.json();
+      setMessages((prev) => mergeLatestPage(prev, latest));
+    }, POLL_INTERVAL_MS);
     return () => clearInterval(interval);
   }, [recipient.id, currentUserId]);
 
-  const syncMessages = useCallback((msgs: MessageWithType[]) => {
-    setDecryptedMessages(msgs);
-  }, []);
-
+  // Auto-scroll only when a new message arrives, not on every poll or when older history loads.
   useEffect(() => {
-    syncMessages(messages);
-  }, [messages, syncMessages]);
-
-  useEffect(() => {
+    const lastId = messages.at(-1)?.id ?? null;
+    if (lastId === lastMessageIdRef.current) return;
+    lastMessageIdRef.current = lastId;
     const c = containerRef.current;
     if (c) c.scrollTo({ top: c.scrollHeight, behavior: "smooth" });
-  }, [decryptedMessages]);
+  }, [messages]);
 
-  useEffect(() => {
-    if (!searchQuery.trim()) {
-      setSearchResults([]);
-      return;
-    }
-    const ids = decryptedMessages
-      .filter((m) =>
-        m.content.toLowerCase().includes(searchQuery.toLowerCase()),
-      )
+  const searchResults = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return [];
+    return messages
+      .filter((m) => m.type === "text" && m.content.toLowerCase().includes(q))
       .map((m) => m.id);
-    setSearchResults(ids);
-    setCurrentSearchIndex(0);
-  }, [searchQuery, decryptedMessages]);
+  }, [searchQuery, messages]);
 
   useEffect(() => {
-    if (!searchResults.length) return;
     const id = searchResults[currentSearchIndex];
+    if (!id) return;
     document
       .getElementById(`msg-${id}`)
       ?.scrollIntoView({ behavior: "smooth", block: "center" });
   }, [currentSearchIndex, searchResults]);
-
-  useEffect(() => {
-    if (!showInputMenu) {
-      setSearchQuery("");
-      setSearchResults([]);
-      setCurrentSearchIndex(0);
-    }
-  }, [showInputMenu]);
 
   const goToPrevResult = () =>
     setCurrentSearchIndex(
@@ -198,7 +179,7 @@ const ChatWindow = ({
     const res = await fetch(
       `/api/chat/messages?recipientId=${recipient.id}&cursor=${cursor}`,
     );
-    const older: MessageWithType[] = await res.json();
+    const older: Message[] = await res.json();
     setMessages((prev) => [...older, ...prev]);
     setHasMore(older.length === PAGE_SIZE);
     setLoadingOlder(false);
@@ -208,7 +189,7 @@ const ChatWindow = ({
     if (!content.trim() || !currentUserId) return;
     const plainText = content.trim();
     setContent("");
-    const optimistic: MessageWithType = {
+    const optimistic: Message = {
       id: crypto.randomUUID(),
       senderId: currentUserId,
       receiverId: recipient.id,
@@ -218,7 +199,7 @@ const ChatWindow = ({
       createdAt: new Date().toISOString(),
       pinned: false,
     };
-    setDecryptedMessages((prev) => [...prev, optimistic]);
+    setMessages((prev) => [...prev, optimistic]);
     try {
       const res = await fetch("/api/chat/messages", {
         method: "POST",
@@ -228,16 +209,13 @@ const ChatWindow = ({
           content: plainText,
         }),
       });
-      const saved: MessageWithType = await res.json();
-      setDecryptedMessages((prev) =>
-        prev.map((m) =>
-          m.id === optimistic.id ? { ...saved, content: plainText } : m,
-        ),
+      if (!res.ok) throw new Error("Failed to send message");
+      const saved: Message = await res.json();
+      setMessages((prev) =>
+        prev.map((m) => (m.id === optimistic.id ? saved : m)),
       );
     } catch {
-      setDecryptedMessages((prev) =>
-        prev.filter((m) => m.id !== optimistic.id),
-      );
+      setMessages((prev) => prev.filter((m) => m.id !== optimistic.id));
       setContent(plainText);
     }
   };
@@ -254,9 +232,6 @@ const ChatWindow = ({
     await fetch(`/api/chat/messages/${pendingDeleteMsgId}`, {
       method: "DELETE",
     });
-    setDecryptedMessages((prev) =>
-      prev.filter((m) => m.id !== pendingDeleteMsgId),
-    );
     setMessages((prev) => prev.filter((m) => m.id !== pendingDeleteMsgId));
     setPendingDeleteMsgId(null);
     setDeletingMsg(false);
@@ -282,7 +257,6 @@ const ChatWindow = ({
       body: JSON.stringify({ recipientId: recipient.id, mode: deleteMode }),
     });
     setMessages([]);
-    setDecryptedMessages([]);
     setDeleteMode(null);
     setDeleting(false);
   };
@@ -316,10 +290,10 @@ const ChatWindow = ({
   };
 
   const statusText = isOnline
-    ? "в сети"
+    ? tr.online
     : lastSeen[recipient.id]
       ? formatLastSeen(lastSeen[recipient.id])
-      : tr.online;
+      : tr.offline;
 
   const deleteModalTitles: Record<NonNullable<DeleteMode>, string> = {
     mine: tr.deleteMyMessages,
@@ -333,7 +307,7 @@ const ChatWindow = ({
     chat: tr.deleteChatDesc,
   };
 
-  const pinned = decryptedMessages.filter((m) => m.pinned);
+  const pinned = messages.filter((m) => m.pinned);
 
   const scrollToPinned = (id: string) => {
     document
@@ -356,7 +330,7 @@ const ChatWindow = ({
         <div className="relative shrink-0">
           <div
             className="w-9 h-9 rounded-full bg-(--bg-card) flex items-center justify-center text-sm font-bold text-(--text-primary) cursor-pointer overflow-hidden"
-            onClick={() => router.push(`/components/profile/${recipient.id}`)}
+            onClick={() => router.push(`/profile/${recipient.id}`)}
           >
             {recipient.image ? (
               <Image
@@ -378,7 +352,7 @@ const ChatWindow = ({
         <div className="flex-1 min-w-0">
           <p
             className="text-sm font-semibold text-(--text-primary) cursor-pointer truncate"
-            onClick={() => router.push(`/components/profile/${recipient.id}`)}
+            onClick={() => router.push(`/profile/${recipient.id}`)}
           >
             {recipient.name}
           </p>
@@ -407,7 +381,10 @@ const ChatWindow = ({
                 ref={searchInputRef}
                 type="text"
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setCurrentSearchIndex(0);
+                }}
                 placeholder={tr.search}
                 className={`bg-(--bg-secondary) rounded-full py-1.5 px-4 text-sm text-(--text-primary) placeholder:text-(--text-secondary) outline-none border-2 border-transparent focus:border-(--text-secondary)/10 transition-all duration-300
                   ${showInputMenu ? "w-80" : "w-0"}`}
@@ -435,7 +412,7 @@ const ChatWindow = ({
 
               {searchQuery.trim() && searchResults.length === 0 && (
                 <span className="text-xs text-(--text-primary)/30 whitespace-nowrap px-3">
-                  не найдено
+                  {tr.nothingFound}
                 </span>
               )}
             </div>
@@ -453,7 +430,7 @@ const ChatWindow = ({
               <button
                 className="w-full flex items-center gap-2 px-3 py-2 text-xs text-(--text-primary)/70 hover:bg-(--bg-card) rounded-lg transition-colors text-left"
                 onClick={() => {
-                  router.push(`/components/profile/${recipient.id}`);
+                  router.push(`/profile/${recipient.id}`);
                   setShowMenu(false);
                 }}
               >
@@ -534,7 +511,7 @@ const ChatWindow = ({
           </div>
         )}
 
-        {decryptedMessages.map((msg) => {
+        {messages.map((msg) => {
           const isMe = msg.senderId === currentUserId;
           const isCurrent = searchResults[currentSearchIndex] === msg.id;
           const isMatch = searchResults.includes(msg.id);
@@ -566,7 +543,7 @@ const ChatWindow = ({
                         await fetch(`/api/chat/messages/${msg.id}/pin`, {
                           method: "PATCH",
                         });
-                        setDecryptedMessages((prev) =>
+                        setMessages((prev) =>
                           prev.map((m) =>
                             m.id === msg.id ? { ...m, pinned: !m.pinned } : m,
                           ),
@@ -621,7 +598,7 @@ const ChatWindow = ({
                 <div className="flex border-b border-(--border)">
                   {EMOJI_CATEGORIES.map((cat, i) => (
                     <button
-                      key={cat.label}
+                      key={cat.label.en}
                       onClick={() => setActiveCat(i)}
                       className={`flex-1 py-2 text-[11px] font-medium transition-colors ${activeCat === i ? "text-(--text-primary) border-b-2 border-(--text-primary) -mb-px" : "text-(--text-primary)/40 hover:text-(--text-primary)/70"}`}
                     >
@@ -630,7 +607,7 @@ const ChatWindow = ({
                   ))}
                 </div>
                 <p className="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-(--text-primary)/30">
-                  {EMOJI_CATEGORIES[activeCat].label}
+                  {EMOJI_CATEGORIES[activeCat].label[lang]}
                 </p>
                 <div className="grid grid-cols-8 gap-px px-2 pb-2">
                   {EMOJI_CATEGORIES[activeCat].emojis.map((emoji) => (

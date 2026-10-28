@@ -16,7 +16,19 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { formatDistanceToNow, format } from "date-fns";
 import { ru, enUS } from "date-fns/locale";
 
-// In-memory кэш комментариев
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+const formatDate = (isoString: string, lang: string) => {
+  const date = new Date(isoString);
+  const locale = lang === "ru" ? ru : enUS;
+
+  if (Date.now() - date.getTime() < DAY_MS) {
+    return formatDistanceToNow(date, { addSuffix: true, locale });
+  }
+  return format(date, "dd.MM.yyyy HH:mm", { locale });
+};
+
+// Comments are cached per post so reopening a thread doesn't refetch it.
 const MAX_CACHE = 50;
 const cache = new Map<string, Comment[]>();
 const setCache = (id: string, comments: Comment[]) => {
@@ -112,7 +124,7 @@ const PostCard = ({
       content: commentText.trim(),
       postId: post.id,
       authorId: currentUserId,
-      author: { id: currentUserId, name: tr.you ?? "Вы", image: null },
+      author: { id: currentUserId, name: tr.you, image: null },
       createdAt: new Date().toISOString(),
     };
     setComments((prev) => {
@@ -129,6 +141,7 @@ const PostCard = ({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content: optimistic.content }),
       });
+      if (!res.ok) throw new Error("Failed to save comment");
       const saved: Comment = await res.json();
       setComments((prev) => {
         const next = prev.map((c) => (c.id === optimistic.id ? saved : c));
@@ -159,9 +172,13 @@ const PostCard = ({
     });
     setCommentToDelete(null);
     try {
-      await fetch(`/api/posts/${post.id}/comments/${commentToDelete}`, {
-        method: "DELETE",
-      });
+      const res = await fetch(
+        `/api/posts/${post.id}/comments/${commentToDelete}`,
+        {
+          method: "DELETE",
+        },
+      );
+      if (!res.ok) throw new Error("Failed to delete comment");
     } catch {
       setComments(prev);
       setCommentsCount(prev.length);
@@ -172,7 +189,8 @@ const PostCard = ({
     if (deletingPost) return;
     setDeletingPost(true);
     try {
-      await fetch(`/api/posts/${post.id}`, { method: "DELETE" });
+      const res = await fetch(`/api/posts/${post.id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Failed to delete post");
       cache.delete(post.id);
       onPostDeleted?.(post.id);
     } catch {
@@ -181,22 +199,7 @@ const PostCard = ({
   };
 
   const isOwn = currentUserId === post.authorId;
-  const username = post.author.name ?? "Аноним";
-
-  const formatDate = (isoString: string, lang: string) => {
-    const date = new Date(isoString);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-
-    if (diffMs < 24 * 60 * 60 * 1000) {
-      const locale = lang === "ru" ? ru : enUS;
-      return formatDistanceToNow(date, { addSuffix: true, locale });
-    }
-
-    return format(date, "dd.MM.yyyy HH:mm", {
-      locale: lang === "ru" ? ru : enUS,
-    });
-  };
+  const username = post.author.name ?? tr.anonymous;
 
   return (
     <div className="rounded-xl bg-(--bg-secondary) overflow-hidden">
@@ -238,7 +241,7 @@ const PostCard = ({
                   className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-red-400 hover:bg-(--bg-card) transition-colors"
                 >
                   <TrashIcon className="w-4 h-4" />
-                  {tr.deletePost ?? "Удалить пост"}
+                  {tr.deletePost}
                 </button>
               </div>
             )}
@@ -253,7 +256,7 @@ const PostCard = ({
             fill
             sizes="100vw"
             className="object-cover px-4"
-            alt="Изображение поста"
+            alt={tr.postImageAlt}
           />
         </div>
       )}
@@ -356,7 +359,6 @@ const PostCard = ({
         )}
       </div>
 
-      {/* Модалка удаления комментария */}
       {commentToDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
           <div className="w-full max-w-md rounded-2xl border border-(--border) bg-(--bg-secondary) p-5 shadow-2xl">
@@ -384,15 +386,14 @@ const PostCard = ({
         </div>
       )}
 
-      {/* Модалка удаления поста */}
       {showDeleteModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
           <div className="w-full max-w-md rounded-2xl border border-(--border) bg-(--bg-secondary) p-5 shadow-2xl">
             <h2 className="text-base font-semibold text-(--text-primary)">
-              {tr.deletePost ?? "Удалить пост"}
+              {tr.deletePost}
             </h2>
             <p className="mt-2 text-sm text-(--text-primary)/60">
-              {tr.deletePostDesc ?? "Это действие нельзя отменить."}
+              {tr.deletePostDesc}
             </p>
             <div className="mt-5 flex justify-end gap-2">
               <button
@@ -408,12 +409,10 @@ const PostCard = ({
                 className="px-3 py-1.5 rounded-lg text-sm font-medium text-white bg-red-500/80 hover:bg-red-500 transition-colors disabled:opacity-50 flex items-center gap-2"
               >
                 {deletingPost ? (
-                  <>
-                    <span className="flex items-center gap-2">
-                      <Loader2 className="w-4.5 h-4.5 animate-spin" />
-                      {tr.deleting}
-                    </span>
-                  </>
+                  <span className="flex items-center gap-2">
+                    <Loader2 className="w-4.5 h-4.5 animate-spin" />
+                    {tr.deleting}
+                  </span>
                 ) : (
                   tr.delete
                 )}

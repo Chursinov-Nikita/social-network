@@ -2,11 +2,7 @@
 
 import { useLang } from "@/app/context/language";
 import { t } from "@/app/translation/translation";
-import {
-  PAGE_SIZE,
-  type GroupChat,
-  type MessageWithType,
-} from "@/app/types/chat";
+import { PAGE_SIZE, type GroupChat, type Message } from "@/app/types/chat";
 import {
   EllipsisVertical,
   Loader2,
@@ -21,22 +17,28 @@ import { useSession } from "next-auth/react";
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { EMOJI_CATEGORIES } from "./emoji";
+import { mergeLatestPage } from "./mergeLatestPage";
+
+const POLL_INTERVAL_MS = 5000;
+const MAX_RECORDING_SEC = 120;
 
 const GroupChatWindow = ({
   groupId,
   groupName,
   groupAvatar,
+  onLeave,
 }: {
   groupId: string;
   groupName: string;
   groupAvatar: string | null;
+  onLeave: () => void;
 }) => {
   const { data: session } = useSession();
   const { lang } = useLang();
   const tr = t[lang];
   const currentUserId = session?.user?.id;
 
-  const [messages, setMessages] = useState<MessageWithType[]>([]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [content, setContent] = useState("");
   const [hasMore, setHasMore] = useState(true);
   const [loadingOlder, setLoadingOlder] = useState(false);
@@ -58,59 +60,42 @@ const GroupChatWindow = ({
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lastMessageIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!currentUserId) return;
+    const url = `/api/groups/${groupId}/messages`;
 
     fetch(`/api/groups/${groupId}`)
-      .then((r) => {
-        if (!r.ok) return null;
-        return r.json();
-      })
-      .then((data) => {
-        if (data) setGroup(data);
-      })
-      .catch(console.error);
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => data && setGroup(data));
 
-    fetch(`/api/groups/${groupId}/messages`)
-      .then((r) => {
-        if (!r.ok) return [];
-        return r.json();
-      })
-      .then((data: MessageWithType[]) => {
+    fetch(url)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data: Message[]) => {
         setMessages(data);
         setHasMore(data.length === PAGE_SIZE);
-      })
-      .catch(console.error);
+      });
 
-    fetch(`/api/groups/${groupId}/messages/read`, { method: "PATCH" }).catch(
-      console.error,
-    );
-  }, [groupId, currentUserId]);
+    fetch(`/api/groups/${groupId}/messages/read`, { method: "PATCH" });
 
-  // ── Polling ──
-  useEffect(() => {
-    if (!currentUserId) return;
     const interval = setInterval(async () => {
-      try {
-        const res = await fetch(`/api/groups/${groupId}/messages`);
-        if (!res.ok) return;
-        const data: MessageWithType[] = await res.json();
-        setMessages(data);
-      } catch {
-        /* игнорируем */
-      }
-    }, 5000);
+      const res = await fetch(url);
+      if (!res.ok) return;
+      const latest: Message[] = await res.json();
+      setMessages((prev) => mergeLatestPage(prev, latest));
+    }, POLL_INTERVAL_MS);
     return () => clearInterval(interval);
   }, [groupId, currentUserId]);
 
-  // ── Скролл вниз ──
   useEffect(() => {
+    const lastId = messages.at(-1)?.id ?? null;
+    if (lastId === lastMessageIdRef.current) return;
+    lastMessageIdRef.current = lastId;
     const c = containerRef.current;
     if (c) c.scrollTo({ top: c.scrollHeight, behavior: "smooth" });
   }, [messages]);
 
-  // ── Закрытие emoji вне клика ──
   useEffect(() => {
     if (!showEmoji) return;
     const handler = (e: MouseEvent) => {
@@ -121,7 +106,6 @@ const GroupChatWindow = ({
     return () => document.removeEventListener("mousedown", handler);
   }, [showEmoji]);
 
-  // ── Закрытие меню вне клика ──
   useEffect(() => {
     if (!showMenu) return;
     const handler = (e: MouseEvent) => {
@@ -132,7 +116,6 @@ const GroupChatWindow = ({
     return () => document.removeEventListener("mousedown", handler);
   }, [showMenu]);
 
-  // ── Enter во время записи ──
   useEffect(() => {
     if (!isRecording) return;
     const handler = (e: KeyboardEvent) => {
@@ -148,9 +131,9 @@ const GroupChatWindow = ({
   const loadOlder = async () => {
     if (!hasMore || loadingOlder || !messages.length) return;
     setLoadingOlder(true);
-    const cursor = messages[0].id;
+    const cursor = messages[0].createdAt;
     const res = await fetch(`/api/groups/${groupId}/messages?cursor=${cursor}`);
-    const older: MessageWithType[] = await res.json();
+    const older: Message[] = await res.json();
     setMessages((prev) => [...older, ...prev]);
     setHasMore(older.length === PAGE_SIZE);
     setLoadingOlder(false);
@@ -161,7 +144,7 @@ const GroupChatWindow = ({
     const plainText = content.trim();
     setContent("");
 
-    const optimistic: MessageWithType = {
+    const optimistic: Message = {
       id: crypto.randomUUID(),
       senderId: currentUserId,
       receiverId: null,
@@ -170,6 +153,7 @@ const GroupChatWindow = ({
       type: "text",
       read: false,
       createdAt: new Date().toISOString(),
+      pinned: false,
     };
     setMessages((prev) => [...prev, optimistic]);
 
@@ -179,7 +163,8 @@ const GroupChatWindow = ({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content: plainText, type: "text" }),
       });
-      const saved: MessageWithType = await res.json();
+      if (!res.ok) throw new Error("Failed to send message");
+      const saved: Message = await res.json();
       setMessages((prev) =>
         prev.map((m) => (m.id === optimistic.id ? saved : m)),
       );
@@ -229,10 +214,10 @@ const GroupChatWindow = ({
       recordingTimerRef.current = setInterval(() => {
         sec++;
         setRecordingTime(sec);
-        if (sec >= 120) stopRecording();
+        if (sec >= MAX_RECORDING_SEC) stopRecording();
       }, 1000);
     } catch {
-      /* нет доступа к микрофону */
+      // Microphone permission denied or unavailable — recording simply doesn't start.
     }
   };
 
@@ -262,7 +247,7 @@ const GroupChatWindow = ({
       reader.readAsDataURL(blob);
     });
     const tempUrl = URL.createObjectURL(blob);
-    const optimistic: MessageWithType = {
+    const optimistic: Message = {
       id: crypto.randomUUID(),
       senderId: currentUserId,
       receiverId: null,
@@ -271,6 +256,7 @@ const GroupChatWindow = ({
       type: "audio",
       read: false,
       createdAt: new Date().toISOString(),
+      pinned: false,
     };
     setMessages((prev) => [...prev, optimistic]);
     try {
@@ -279,25 +265,22 @@ const GroupChatWindow = ({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content: base64, type: "audio" }),
       });
-      const saved: MessageWithType = await res.json();
+      if (!res.ok) throw new Error("Failed to send voice message");
+      const saved: Message = await res.json();
       setMessages((prev) =>
-        prev.map((m) =>
-          m.id === optimistic.id
-            ? { ...saved, content: tempUrl, type: "audio" as const }
-            : m,
-        ),
+        prev.map((m) => (m.id === optimistic.id ? saved : m)),
       );
     } catch {
-      URL.revokeObjectURL(tempUrl);
       setMessages((prev) => prev.filter((m) => m.id !== optimistic.id));
+    } finally {
+      URL.revokeObjectURL(tempUrl);
     }
   };
 
   return (
     <div className="flex flex-col h-full overflow-hidden bg-(--bg-primary)">
-      {/* ── Header ── */}
       <div className="bg-(--bg-primary) border-b border-(--border)">
-        <div className="flex items-center gap-3 px-4 py-3.5">
+        <div className="relative flex items-center gap-3 px-4 py-3.5">
           <div className="w-9 h-9 rounded-full bg-blue-500/20 flex items-center justify-center text-sm font-bold text-blue-400 shrink-0">
             {groupAvatar ? (
               <Image
@@ -316,7 +299,7 @@ const GroupChatWindow = ({
               {groupName}
             </p>
             <p className="text-xs text-(--text-primary)/30">
-              {group?.members?.length ?? 0} участников
+              {tr.membersCount(group?.members?.length ?? 0)}
             </p>
           </div>
 
@@ -329,52 +312,41 @@ const GroupChatWindow = ({
             </button>
             {showMenu && (
               <div className="absolute right-0 top-10 z-30 bg-(--bg-secondary) border border-(--border) rounded-xl p-1 shadow-xl min-w-48">
-                <div>
+                <button
+                  className="w-full flex items-center gap-2 px-3 py-2 text-xs text-(--text-primary)/70 hover:bg-(--bg-card) rounded-lg transition-colors text-left"
+                  onClick={async () => {
+                    await fetch(`/api/groups/${groupId}/members`, {
+                      method: "DELETE",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ userId: currentUserId }),
+                    });
+                    setShowMenu(false);
+                    onLeave();
+                  }}
+                >
+                  {tr.leaveGroup}
+                </button>
+
+                {group?.createdBy === currentUserId && (
                   <button
-                    onClick={() => {
-                      setShowMenu(false);
-                    }}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-(--text-primary)/70 hover:bg-(--bg-card) rounded-lg transition-colors text-left"
-                  >
-                    Участники
-                  </button>
-                  <button
-                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-(--text-primary)/70 hover:bg-(--bg-card) rounded-lg transition-colors text-left"
+                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-red-400 hover:bg-red-500/10 rounded-lg transition-colors text-left"
                     onClick={async () => {
-                      await fetch(`/api/groups/${groupId}/members`, {
+                      await fetch(`/api/groups/${groupId}`, {
                         method: "DELETE",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ userId: currentUserId }),
                       });
                       setShowMenu(false);
-                      window.location.reload();
+                      onLeave();
                     }}
                   >
-                    Выйти из группы
+                    {tr.deleteGroup}
                   </button>
-
-                  {group?.createdBy === currentUserId && (
-                    <button
-                      className="w-full flex items-center gap-2 px-3 py-2 text-xs text-(--text-primary)/70 hover:bg-(--bg-card) rounded-lg transition-colors text-left"
-                      onClick={async () => {
-                        await fetch(`/api/groups/${groupId}`, {
-                          method: "DELETE",
-                        });
-                        setShowMenu(false);
-                        window.location.reload();
-                      }}
-                    >
-                      Удалить группу
-                    </button>
-                  )}
-                </div>
+                )}
               </div>
             )}
           </div>
         </div>
       </div>
 
-      {/* ── Messages ── */}
       <div
         ref={containerRef}
         className="flex-1 min-h-0 overflow-y-auto px-4 py-4 space-y-1 [scrollbar-width:thin] [scrollbar-color:var(--border)_transparent]"
@@ -412,8 +384,7 @@ const GroupChatWindow = ({
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 )}
-                <div className={`${isAudio ? "" : "max-w-xs"}`}>
-                  {/* Имя отправителя для чужих сообщений */}
+                <div className={isAudio ? "" : "max-w-xs"}>
                   {!isMe && (
                     <p className="text-[10px] text-(--text-primary)/40 mb-0.5 px-1">
                       {senderName}
@@ -422,7 +393,11 @@ const GroupChatWindow = ({
                   <div
                     className={`px-3 py-2.5 rounded-2xl text-sm leading-relaxed text-(--text-primary) ${isMe ? "bg-(--bg-card) rounded-br-sm" : "bg-(--bg-secondary) rounded-bl-sm"}`}
                   >
-                    <p>{msg.content}</p>
+                    {isAudio ? (
+                      <audio controls src={msg.content} className="h-9" />
+                    ) : (
+                      <p>{msg.content}</p>
+                    )}
                     <p className="text-[10px] mt-1 text-right text-(--text-primary)/30">
                       {new Date(msg.createdAt).toLocaleTimeString(lang, {
                         hour: "2-digit",
@@ -437,7 +412,6 @@ const GroupChatWindow = ({
         })}
       </div>
 
-      {/* ── Input ── */}
       <div className="py-5 px-3">
         {isRecording ? (
           <div className="flex items-center gap-3 bg-(--bg-secondary) rounded-full px-4 py-2.5">
@@ -472,7 +446,7 @@ const GroupChatWindow = ({
                   <div className="flex border-b border-(--border)">
                     {EMOJI_CATEGORIES.map((cat, i) => (
                       <button
-                        key={cat.label}
+                        key={cat.label.en}
                         onClick={() => setActiveCat(i)}
                         className={`flex-1 py-2 text-[11px] font-medium transition-colors ${
                           activeCat === i
@@ -485,7 +459,7 @@ const GroupChatWindow = ({
                     ))}
                   </div>
                   <p className="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-(--text-primary)/30">
-                    {EMOJI_CATEGORIES[activeCat].label}
+                    {EMOJI_CATEGORIES[activeCat].label[lang]}
                   </p>
                   <div className="grid grid-cols-8 gap-px px-2 pb-2">
                     {EMOJI_CATEGORIES[activeCat].emojis.map((emoji) => (
@@ -530,7 +504,6 @@ const GroupChatWindow = ({
         )}
       </div>
 
-      {/* ── Модалка удаления сообщения ── */}
       {pendingDeleteMsgId && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4"

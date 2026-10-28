@@ -11,9 +11,10 @@ export async function DELETE(
 
   const { id } = await params;
 
-  await prisma.post.delete({
+  const { count } = await prisma.post.deleteMany({
     where: { id, authorId: session.user.id },
   });
+  if (!count) return Response.json({ error: "Not found" }, { status: 404 });
 
   return Response.json({ ok: true });
 }

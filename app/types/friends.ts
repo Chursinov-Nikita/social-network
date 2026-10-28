@@ -1,21 +1,19 @@
-export type Friendship = {
-  id: string;
-  senderId: string;
-  receiverId: string;
-  status: string;
-  sender: FriendUser;
-};
-
 export type FriendUser = {
   id: string;
   name: string | null;
   image: string | null;
 };
 
-export type SearchUser = {
+export type Friendship = {
   id: string;
-  name: string | null;
-  image: string | null;
+  senderId: string;
+  receiverId: string;
+  status: string;
+  sender: FriendUser;
+  receiver: FriendUser;
+};
+
+export type SearchUser = FriendUser & {
   relationStatus: "none" | "pending" | "accepted";
 };
 
@@ -25,5 +23,3 @@ export type FriendToRemove = {
 };
 
 export type Tab = "friends" | "requests" | "search";
-
-export type FriendShipStatus = "pending" | "accepted" | "rejected";

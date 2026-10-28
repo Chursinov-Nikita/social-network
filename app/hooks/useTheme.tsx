@@ -1,28 +1,19 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
+import { useStoredValue } from "./useStoredValue";
+
+type Theme = "dark" | "light";
+const THEMES = ["dark", "light"] as const;
 
 const useTheme = () => {
-  const [theme, setTheme] = useState<"dark" | "light">("dark"); // всегда dark на сервере
+  const [theme, setTheme] = useStoredValue<Theme>("theme", "dark", THEMES);
 
   useEffect(() => {
-    const saved = localStorage.getItem("theme") as "dark" | "light" | null;
-    if (saved) {
-      setTheme(saved);
-      document.documentElement.classList.toggle("dark", saved === "dark");
-    } else {
-      document.documentElement.classList.add("dark");
-    }
-  }, []);
+    document.documentElement.classList.toggle("dark", theme === "dark");
+  }, [theme]);
 
-  const toggle = () => {
-    setTheme((prev) => {
-      const next = prev === "dark" ? "light" : "dark";
-      localStorage.setItem("theme", next);
-      document.documentElement.classList.toggle("dark", next === "dark");
-      return next;
-    });
-  };
+  const toggle = () => setTheme(theme === "dark" ? "light" : "dark");
 
-  return { toggle, theme };
+  return { theme, toggle };
 };
 
 export default useTheme;

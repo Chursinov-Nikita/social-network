@@ -1,15 +1,10 @@
-export const getLinks = (tr: {
-  feed: string;
-  chat: string;
-  reels: string;
-  friends: string;
-  notifications: string;
-  about: string;
-}) => [
+import type { Translation } from "@/app/translation/translation";
+
+export const getLinks = (tr: Translation) => [
   { href: "/", label: tr.feed },
-  { href: "/components/chat", label: tr.chats },
-  { href: "/components/reels", label: tr.reels },
-  { href: "/components/friends", label: tr.friends },
-  { href: "/components/notifications", label: tr.notifications },
-  { href: "/components/about", label: tr.about },
+  { href: "/chat", label: tr.chats },
+  { href: "/reels", label: tr.reels },
+  { href: "/friends", label: tr.friends },
+  { href: "/notifications", label: tr.notifications },
+  { href: "/about", label: tr.about },
 ];

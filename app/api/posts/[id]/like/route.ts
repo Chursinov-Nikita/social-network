@@ -24,7 +24,6 @@ export async function POST(
     data: { postId: id, userId: session.user.id },
   });
 
-  // Уведомление автору поста
   const post = await prisma.post.findUnique({
     where: { id },
     select: { authorId: true },
@@ -34,7 +33,7 @@ export async function POST(
       data: {
         userId: post.authorId,
         type: "like",
-        content: `${session.user.name ?? "Кто-то"} лайкнул ваш пост`,
+        content: `${session.user.name ?? "Someone"} liked your post`,
         senderId: session.user.id,
       },
     });

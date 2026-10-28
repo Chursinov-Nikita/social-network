@@ -32,15 +32,14 @@ export async function POST(
 
   const { id } = await params;
   const { content } = await req.json();
-  if (!content?.trim())
-    return Response.json({ error: "Empty comment" }, { status: 400 });
+  const text = typeof content === "string" ? content.trim() : "";
+  if (!text) return Response.json({ error: "Empty comment" }, { status: 400 });
 
   const comment = await prisma.comment.create({
-    data: { content, postId: id, authorId: session.user.id },
+    data: { content: text, postId: id, authorId: session.user.id },
     include: { author: { select: { id: true, name: true, image: true } } },
   });
 
-  // Уведомление автору поста
   const post = await prisma.post.findUnique({
     where: { id },
     select: { authorId: true },
@@ -50,7 +49,7 @@ export async function POST(
       data: {
         userId: post.authorId,
         type: "comment",
-        content: `${session.user.name ?? "Кто-то"} прокомментировал ваш пост`,
+        content: `${session.user.name ?? "Someone"} commented on your post`,
         senderId: session.user.id,
       },
     });

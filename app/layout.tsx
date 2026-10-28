@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Nunito } from "next/font/google";
 import "./globals.css";
-import Header from "./components/header/page";
+import Header from "./components/header/Header";
 import { LanguageProvider } from "./context/language";
 import { SessionProvider } from "next-auth/react";
 
@@ -14,7 +14,8 @@ const nunito = Nunito({
 export const metadata: Metadata = {
   title: "NEBL",
   icons: "/icon.svg",
-  description: "Speaking with everyone",
+  description:
+    "NEBL — a social network with a feed, reels, real-time chats and friends.",
 };
 
 export default function RootLayout({
@@ -23,7 +24,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" className="dark" suppressHydrationWarning>
       <body className={`${nunito.className} antialiased`}>
         <SessionProvider>
           <LanguageProvider>

@@ -1,9 +1,9 @@
 "use client";
 import { createContext, useContext } from "react";
-import useLanguage from "../hooks/useLanguage";
+import useLanguage, { type Lang } from "../hooks/useLanguage";
 
 type LanguageContextType = {
-  lang: "en" | "ru";
+  lang: Lang;
   toggle: () => void;
 };
 
