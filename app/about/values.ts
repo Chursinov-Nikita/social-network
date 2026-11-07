@@ -1,18 +1,19 @@
 import { t } from "@/app/translation/translation";
+import { Image, MessageCircle, ShieldCheck } from "lucide-react";
 
 export const getFeatures = (tr: typeof t.en) => [
   {
-    icon: "💬",
+    icon: MessageCircle,
     title: tr.featureChat,
     description: tr.featureChatDesc,
   },
   {
-    icon: "📸",
+    icon: Image,
     title: tr.featurePhoto,
     description: tr.featurePhotoDesc,
   },
   {
-    icon: "🔒",
+    icon: ShieldCheck,
     title: tr.featurePrivacy,
     description: tr.featurePrivacyDesc,
   },
@@ -20,22 +21,18 @@ export const getFeatures = (tr: typeof t.en) => [
 
 export const getValues = (tr: typeof t.en) => [
   {
-    icon: "🤝",
     title: tr.valueRespect,
     description: tr.valueRespectDesc,
   },
   {
-    icon: "💡",
     title: tr.valueInnovation,
     description: tr.valueInnovationDesc,
   },
   {
-    icon: "🌍",
     title: tr.valueInclusivity,
     description: tr.valueInclusivityDesc,
   },
   {
-    icon: "⚡",
     title: tr.valueSimplicity,
     description: tr.valueSimplicityDesc,
   },

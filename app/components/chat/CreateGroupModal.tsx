@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react";
 import { Check, X } from "lucide-react";
 import { ChatUser, GroupChat } from "@/app/types/chat";
-import Image from "next/image";
+import Avatar from "@/app/components/ui/Avatar";
+import { Dialog } from "@/app/components/ui/Dialog";
 import { t } from "@/app/translation/translation";
 import { useLang } from "@/app/context/language";
 
@@ -49,106 +50,85 @@ const CreateGroupModal = ({ onClose, onCreate }: Props) => {
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4"
-      onClick={() => !loading && onClose()}
-    >
-      <div
-        className="w-full max-w-sm rounded-2xl border border-(--border) bg-(--bg-primary) p-5 space-y-4"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <p className="text-sm font-semibold text-(--text-primary)">
-          {tr.newGroup}
-        </p>
+    <Dialog title={tr.newGroup} onClose={() => !loading && onClose()}>
+      <input
+        type="text"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        placeholder={tr.groupName}
+        aria-label={tr.groupName}
+        autoFocus
+        className="field mt-4"
+      />
 
-        <input
-          type="text"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder={tr.groupName}
-          className="w-full rounded-xl border border-(--border) bg-(--bg-primary) px-3 py-2 text-sm text-(--text-primary) placeholder:text-(--text-primary)/25 outline-none focus:border-(--text-primary)/20 transition-colors"
-        />
-
-        {selected.length > 0 && (
-          <div className="flex flex-wrap gap-1.5">
-            {selected.map((id) => {
-              const user = users.find((u) => u.id === id);
-              if (!user) return null;
-              return (
-                <span
-                  key={id}
-                  className="flex items-center gap-1 px-2 py-1 rounded-full bg-(--bg-card) text-xs text-(--text-primary)"
+      {selected.length > 0 && (
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {selected.map((id) => {
+            const user = users.find((u) => u.id === id);
+            if (!user) return null;
+            return (
+              <span
+                key={id}
+                className="flex h-7 items-center gap-1 rounded-full bg-raised pr-1 pl-3 text-sm"
+              >
+                {user.name}
+                <button
+                  onClick={() => toggle(id)}
+                  aria-label={tr.remove}
+                  className="flex size-5 cursor-pointer items-center justify-center rounded-full text-muted transition-colors hover:text-danger"
                 >
-                  {user.name}
-                  <button onClick={() => toggle(id)}>
-                    <X className="w-3 h-3 text-(--text-primary)/40 hover:text-red-400" />
-                  </button>
-                </span>
-              );
-            })}
-          </div>
-        )}
+                  <X className="size-3" />
+                </button>
+              </span>
+            );
+          })}
+        </div>
+      )}
 
-        <input
-          type="text"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder={tr.searchMembers}
-          className="w-full rounded-xl border border-(--border) bg-(--bg-primary) px-3 py-2 text-sm text-(--text-primary) placeholder:text-(--text-primary)/25 outline-none focus:border-(--text-primary)/20 transition-colors"
-        />
+      <input
+        type="text"
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        placeholder={tr.searchMembers}
+        aria-label={tr.searchMembers}
+        className="field mt-3"
+      />
 
-        <div className="max-h-48 overflow-y-auto space-y-0.5 [scrollbar-width:thin]">
-          {filtered.map((user) => (
+      <div className="thin-scroll -mx-2 mt-2 max-h-56 overflow-y-auto">
+        {filtered.map((user) => {
+          const isSelected = selected.includes(user.id);
+          return (
             <button
               key={user.id}
               onClick={() => toggle(user.id)}
-              className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${
-                selected.includes(user.id)
-                  ? "bg-(--bg-card)"
-                  : "hover:bg-(--bg-card)/50"
+              aria-pressed={isSelected}
+              className={`flex w-full cursor-pointer items-center gap-3 rounded-xl px-2 py-1.5 transition-colors ${
+                isSelected ? "bg-active" : "hover:bg-raised"
               }`}
             >
-              <div className="w-8 h-8 rounded-full bg-(--bg-card) flex items-center justify-center text-xs font-bold text-(--text-primary) shrink-0 overflow-hidden">
-                {user.image ? (
-                  <Image
-                    src={user.image}
-                    width={32}
-                    height={32}
-                    className="rounded-full object-cover"
-                    alt={user.name ?? ""}
-                  />
-                ) : (
-                  (user.name ?? "?")[0].toUpperCase()
-                )}
-              </div>
-              <span className="flex-1 text-left text-sm text-(--text-primary)">
+              <Avatar name={user.name} image={user.image} size={36} />
+              <span className="min-w-0 flex-1 truncate text-left text-base">
                 {user.name}
               </span>
-              {selected.includes(user.id) && (
-                <Check className="w-4 h-4 text-green-500" />
-              )}
+              {isSelected && <Check className="size-4 shrink-0" />}
             </button>
-          ))}
-        </div>
-
-        <div className="flex justify-end gap-2">
-          <button
-            onClick={onClose}
-            disabled={loading}
-            className="px-4 py-2 text-xs font-semibold text-(--text-primary)/60 hover:bg-(--bg-card) rounded-xl transition-colors disabled:opacity-40"
-          >
-            {tr.cancel}
-          </button>
-          <button
-            onClick={handleCreate}
-            disabled={!name.trim() || selected.length === 0 || loading}
-            className="px-4 py-2 text-xs font-semibold text-(--text-primary) bg-(--bg-card) hover:opacity-80 rounded-xl transition-colors disabled:opacity-30"
-          >
-            {loading ? tr.creating : tr.createFolder}
-          </button>
-        </div>
+          );
+        })}
       </div>
-    </div>
+
+      <div className="mt-4 flex justify-end gap-1">
+        <button onClick={onClose} disabled={loading} className="btn btn-ghost">
+          {tr.cancel}
+        </button>
+        <button
+          onClick={handleCreate}
+          disabled={!name.trim() || selected.length === 0 || loading}
+          className="btn btn-primary"
+        >
+          {loading ? tr.creating : tr.createFolder}
+        </button>
+      </div>
+    </Dialog>
   );
 };
 

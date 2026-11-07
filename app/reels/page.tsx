@@ -1,19 +1,19 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
-import Image from "next/image";
 import {
   Heart,
   MessageCircle,
   Volume2,
   VolumeX,
   Trash2,
-  Loader2,
-  Film,
   Plus,
-  X,
 } from "lucide-react";
+import ReelUploadDialog from "@/app/components/reels/ReelUploadDialog";
+import Avatar from "@/app/components/ui/Avatar";
+import { ConfirmDialog } from "@/app/components/ui/Dialog";
+import { Spinner } from "@/app/components/ui/States";
 import { useLang } from "@/app/context/language";
 import { t } from "@/app/translation/translation";
 import type { Reel } from "@/app/types/reels";
@@ -40,24 +40,10 @@ export default function ReelsPage() {
   const [initialLoading, setInitialLoading] = useState(true);
   const [muted, setMuted] = useState(true);
   const [showUpload, setShowUpload] = useState(false);
-  const [uploadFile, setUploadFile] = useState<File | null>(null);
-  const [uploadCaption, setUploadCaption] = useState("");
-  const [uploading, setUploading] = useState(false);
-  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [reelToDelete, setReelToDelete] = useState<string | null>(null);
   const videoRefs = useRef<Record<string, HTMLVideoElement | null>>({});
   const viewedIds = useRef<Set<string>>(new Set());
-
-  const previewUrl = useMemo(
-    () => (uploadFile ? URL.createObjectURL(uploadFile) : null),
-    [uploadFile],
-  );
-
-  useEffect(
-    () => () => {
-      if (previewUrl) URL.revokeObjectURL(previewUrl);
-    },
-    [previewUrl],
-  );
+  const scrollerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetchReels(null)
@@ -134,7 +120,6 @@ export default function ReelsPage() {
   };
 
   const deleteReel = async (id: string) => {
-    if (!confirm(tr.deleteReelConfirm)) return;
     const prevReels = reels;
     setReels((prev) => prev.filter((r) => r.id !== id));
     try {
@@ -145,243 +130,179 @@ export default function ReelsPage() {
     }
   };
 
-  const closeUpload = () => {
-    setShowUpload(false);
-    setUploadFile(null);
-    setUploadCaption("");
-    setUploadError(null);
-  };
-
-  const uploadReel = async () => {
-    if (!uploadFile) return;
-    setUploading(true);
-    setUploadError(null);
-    try {
-      const formData = new FormData();
-      formData.append("video", uploadFile);
-      const uploadRes = await fetch("/api/reels/upload", {
-        method: "POST",
-        body: formData,
-      });
-      if (!uploadRes.ok) throw new Error("Upload failed");
-      const { url } = await uploadRes.json();
-
-      const res = await fetch("/api/reels", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ videoUrl: url, caption: uploadCaption || null }),
-      });
-      if (!res.ok) throw new Error("Reel creation failed");
-
-      const newReel = await res.json();
-      setReels((prev) => [
-        { ...newReel, likesCount: 0, commentsCount: 0, isLiked: false },
-        ...prev,
-      ]);
-      closeUpload();
-    } catch {
-      setUploadError(tr.uploadReelFailed);
-    } finally {
-      setUploading(false);
-    }
-  };
-
   if (initialLoading) {
     return (
-      <div className="h-screen w-full flex items-center justify-center bg-(--bg-primary) text-(--text-secondary) gap-2">
-        <Loader2 className="w-5 h-5 animate-spin" />
-        <span>{tr.loadingReels}</span>
+      <div className="flex h-[calc(100dvh-var(--tabbar))] items-center justify-center">
+        <h1 className="sr-only">{tr.reels}</h1>
+        <Spinner label={tr.loadingReels} />
       </div>
     );
   }
 
   return (
     <div
-      className="h-screen w-full overflow-y-scroll snap-y snap-mandatory bg-(--bg-primary) relative [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      ref={scrollerRef}
+      className="no-scrollbar relative h-[calc(100dvh-var(--tabbar))] w-full snap-y snap-mandatory overflow-y-scroll bg-black md:bg-canvas"
       onScroll={(e) => {
         const el = e.currentTarget;
         if (el.scrollTop + el.clientHeight >= el.scrollHeight - 200)
           void loadMore();
       }}
     >
+      <h1 className="sr-only">{tr.reels}</h1>
+
       {userId && (
         <button
           onClick={() => setShowUpload(true)}
           aria-label={tr.newReel}
-          className="fixed bottom-6 right-4 z-40 p-4 rounded-full bg-(--text-primary) text-(--bg-primary) shadow-lg active:scale-90 transition-transform"
+          title={tr.newReel}
+          className="btn fixed top-3 left-3 z-20 size-10 bg-white px-0 text-black hover:opacity-85 md:top-4 md:right-6 md:left-auto md:bg-primary md:text-on-primary"
         >
-          <Plus className="w-6 h-6" />
+          <Plus className="size-5" />
         </button>
       )}
 
       {reels.length === 0 && (
-        <div className="h-screen w-full flex flex-col items-center justify-center text-(--text-secondary) gap-3">
-          <Film className="w-10 h-10" />
-          <p>{tr.noReelsYet}</p>
+        <div className="flex h-full flex-col items-center justify-center gap-3 bg-canvas px-4 text-center">
+          <p className="text-base text-muted">{tr.noReelsYet}</p>
+          {userId && (
+            <button
+              onClick={() => setShowUpload(true)}
+              className="btn btn-primary"
+            >
+              {tr.newReel}
+            </button>
+          )}
         </div>
       )}
 
       {reels.map((reel) => (
-        <div
+        <section
           key={reel.id}
-          className="relative h-screen w-full snap-start flex items-center justify-center overflow-hidden bg-black"
+          className="relative flex h-full w-full snap-start items-center justify-center md:gap-3 md:p-4"
         >
-          <video
-            ref={(el) => {
-              videoRefs.current[reel.id] = el;
-            }}
-            data-reel-id={reel.id}
-            src={reel.videoUrl}
-            poster={reel.thumbnailUrl ?? undefined}
-            loop
-            muted={muted}
-            playsInline
-            className="h-full w-full object-contain bg-black"
-            onClick={() => setMuted((m) => !m)}
-          />
+          <div className="relative h-full w-full overflow-hidden bg-black md:aspect-9/16 md:w-auto md:rounded-2xl">
+            <video
+              ref={(el) => {
+                videoRefs.current[reel.id] = el;
+              }}
+              data-reel-id={reel.id}
+              src={reel.videoUrl}
+              poster={reel.thumbnailUrl ?? undefined}
+              loop
+              muted={muted}
+              playsInline
+              className="h-full w-full bg-black object-contain"
+              onClick={() => setMuted((m) => !m)}
+            />
 
-          <div className="absolute inset-x-0 bottom-0 h-64 bg-linear-to-t from-black/90 via-black/40 to-transparent pointer-events-none" />
-
-          <button
-            onClick={() => setMuted((m) => !m)}
-            className="absolute top-4 right-4 p-2 rounded-full bg-black/40 backdrop-blur-sm text-white active:scale-90 transition-transform"
-          >
-            {muted ? (
-              <VolumeX className="w-5 h-5" />
-            ) : (
-              <Volume2 className="w-5 h-5" />
-            )}
-          </button>
-
-          <div className="absolute bottom-8 left-4 right-16 text-white">
-            <div className="flex items-center gap-2 mb-1">
-              {reel.user.image ? (
-                <Image
-                  src={reel.user.image}
-                  alt={reel.user.name ?? ""}
-                  width={36}
-                  height={36}
-                  className="w-9 h-9 rounded-full object-cover border border-white/30"
-                />
+            <button
+              onClick={() => setMuted((m) => !m)}
+              aria-label={tr.toggleSound}
+              aria-pressed={!muted}
+              className="absolute top-3 right-3 flex size-10 cursor-pointer items-center justify-center rounded-full bg-black/50 text-white transition-transform duration-150 active:scale-90"
+            >
+              {muted ? (
+                <VolumeX className="size-5" />
               ) : (
-                <div className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center text-sm font-semibold">
-                  {reel.user.name?.[0]?.toUpperCase() ?? "?"}
-                </div>
+                <Volume2 className="size-5" />
               )}
-              <p className="font-semibold text-sm drop-shadow">
-                {reel.user.name ?? tr.anonymous}
-              </p>
+            </button>
+
+            <div className="absolute right-16 bottom-3 left-3 rounded-2xl bg-black/60 p-3 text-white md:right-3">
+              <div className="flex items-center gap-2.5">
+                <Avatar
+                  name={reel.user.name ?? tr.anonymous}
+                  image={reel.user.image}
+                  size={36}
+                />
+                <p className="truncate text-base font-medium">
+                  {reel.user.name ?? tr.anonymous}
+                </p>
+              </div>
+              {reel.caption && (
+                <p className="mt-1.5 text-base wrap-break-word">
+                  {reel.caption}
+                </p>
+              )}
             </div>
-            {reel.caption && (
-              <p className="text-sm text-white/90 drop-shadow leading-snug">
-                {reel.caption}
-              </p>
-            )}
           </div>
 
-          <div className="absolute bottom-24 right-3 flex flex-col items-center gap-6 text-white">
+          <div className="absolute right-2 bottom-20 flex flex-col items-center gap-3 text-white md:static md:self-end md:pb-2 md:text-ink">
             <button
               onClick={() => toggleLike(reel.id)}
               disabled={!userId}
-              className="flex flex-col items-center gap-1 active:scale-90 transition-transform"
+              aria-pressed={reel.isLiked}
+              aria-label={`${tr.likes}: ${reel.likesCount}`}
+              className="flex cursor-pointer flex-col items-center gap-1 transition-transform duration-150 active:scale-90 disabled:cursor-default"
             >
-              <Heart
-                className="w-8 h-8 drop-shadow"
-                fill={reel.isLiked ? "#ef4444" : "none"}
-                stroke={reel.isLiked ? "#ef4444" : "white"}
-              />
-              <span className="text-xs font-medium drop-shadow">
+              <span className="flex size-11 items-center justify-center rounded-full bg-black/60 md:bg-panel">
+                <Heart
+                  className={`size-6 ${reel.isLiked ? "fill-current" : ""}`}
+                  strokeWidth={1.75}
+                />
+              </span>
+              <span className="rounded-full bg-black/60 px-1.5 text-xs font-medium tabular-nums md:bg-transparent">
                 {reel.likesCount}
               </span>
             </button>
 
             <div className="flex flex-col items-center gap-1">
-              <MessageCircle className="w-8 h-8 drop-shadow" stroke="white" />
-              <span className="text-xs font-medium drop-shadow">
+              <span className="flex size-11 items-center justify-center rounded-full bg-black/60 md:bg-panel">
+                <MessageCircle className="size-6" strokeWidth={1.75} />
+              </span>
+              <span className="rounded-full bg-black/60 px-1.5 text-xs font-medium tabular-nums md:bg-transparent">
                 {reel.commentsCount}
               </span>
             </div>
 
             {userId === reel.user.id && (
               <button
-                onClick={() => deleteReel(reel.id)}
+                onClick={() => setReelToDelete(reel.id)}
                 aria-label={tr.delete}
-                className="flex flex-col items-center gap-1 active:scale-90 transition-transform"
+                className="flex size-11 cursor-pointer items-center justify-center rounded-full bg-black/60 transition-transform duration-150 active:scale-90 md:bg-panel"
               >
-                <Trash2 className="w-7 h-7 drop-shadow text-red-400" />
+                <Trash2 className="size-5" strokeWidth={1.75} />
               </button>
             )}
           </div>
-        </div>
+        </section>
       ))}
 
       {loading && (
-        <div className="h-screen w-full flex items-center justify-center text-(--text-secondary) gap-2 bg-(--bg-primary)">
-          <Loader2 className="w-5 h-5 animate-spin" />
-          <span>{tr.loading}</span>
+        <div className="flex h-full items-center justify-center bg-canvas">
+          <Spinner label={tr.loading} />
         </div>
       )}
 
-      {showUpload && (
-        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
-          <div className="bg-(--bg-card) rounded-xl w-full max-w-sm flex flex-col gap-4 p-5">
-            <div className="flex items-center justify-between">
-              <p className="text-(--text-primary) font-semibold">
-                {tr.newReel}
-              </p>
-              <button
-                onClick={closeUpload}
-                aria-label={tr.cancel}
-                className="text-(--text-secondary) active:scale-90 transition-transform"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
+      {reelToDelete && (
+        <ConfirmDialog
+          title={tr.delete}
+          description={tr.deleteReelConfirm}
+          confirmLabel={tr.delete}
+          cancelLabel={tr.cancel}
+          onConfirm={() => {
+            const id = reelToDelete;
+            setReelToDelete(null);
+            void deleteReel(id);
+          }}
+          onCancel={() => setReelToDelete(null)}
+        />
+      )}
 
-            {previewUrl ? (
-              <video
-                src={previewUrl}
-                controls
-                className="w-full max-h-64 rounded-lg bg-black"
-              />
-            ) : (
-              <label className="flex flex-col items-center justify-center gap-2 border border-dashed border-(--border) rounded-lg h-40 text-(--text-secondary) cursor-pointer">
-                <Plus className="w-6 h-6" />
-                <span className="text-sm">{tr.clickToSelectVideo}</span>
-                <input
-                  type="file"
-                  accept="video/mp4,video/webm,video/quicktime"
-                  className="hidden"
-                  onChange={(e) => setUploadFile(e.target.files?.[0] ?? null)}
-                />
-              </label>
-            )}
-
-            <textarea
-              value={uploadCaption}
-              onChange={(e) => setUploadCaption(e.target.value)}
-              placeholder={tr.descriptionOptional}
-              rows={2}
-              className="w-full bg-(--bg-secondary) text-(--text-primary) placeholder-(--text-secondary) rounded-lg p-3 text-sm resize-none focus:outline-none focus:ring-1 focus:ring-(--border)"
-            />
-
-            {uploadError && (
-              <p className="text-red-400 text-sm">{uploadError}</p>
-            )}
-
-            <button
-              onClick={uploadReel}
-              disabled={!uploadFile || uploading}
-              className="w-full bg-(--text-primary) text-(--bg-primary) font-semibold rounded-lg py-2.5 flex items-center justify-center gap-2 disabled:opacity-40 active:scale-95 transition-transform"
-            >
-              {uploading ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                tr.postReel
-              )}
-            </button>
-          </div>
-        </div>
+      {showUpload && userId && (
+        <ReelUploadDialog
+          userId={userId}
+          onClose={() => setShowUpload(false)}
+          onPublished={(newReel) => {
+            setReels((prev) => [
+              { ...newReel, likesCount: 0, commentsCount: 0, isLiked: false },
+              ...prev,
+            ]);
+            setShowUpload(false);
+            scrollerRef.current?.scrollTo({ top: 0 });
+          }}
+        />
       )}
     </div>
   );

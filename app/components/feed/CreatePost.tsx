@@ -1,8 +1,9 @@
 "use client";
+import Avatar from "@/app/components/ui/Avatar";
 import { useLang } from "@/app/context/language";
 import { t } from "@/app/translation/translation";
 import type { Post } from "@/app/types/feed";
-import { ImagePlus, Loader2 } from "lucide-react";
+import { ImagePlus, Loader2, SendHorizontal, X } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
 
@@ -56,7 +57,7 @@ const CreatePost = ({
 }: {
   onPostCreated?: (post: Post) => void;
 }) => {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
   const { lang } = useLang();
   const tr = t[lang];
 
@@ -146,58 +147,46 @@ const CreatePost = ({
     }
   };
 
+  if (status === "unauthenticated") return null;
+
+  const canSubmit =
+    !loading && !compressing && Boolean(content.trim() || image);
+
   return (
-    <div className="rounded-xl bg-(--bg-secondary) p-4 space-y-3">
-      <textarea
-        value={content}
-        onChange={(e) => setContent(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" && !e.shiftKey) {
-            e.preventDefault();
-            if (!loading && !compressing && (content.trim() || image))
-              handleSubmit();
-          }
-        }}
-        placeholder={tr.whatsOnYourMind}
-        rows={3}
-        className="w-full bg-(--bg-primary) border border-(--border) focus:border-(--text-primary)/20 rounded-xl p-3 resize-none focus:outline-none text-sm text-(--text-primary) placeholder:text-(--text-primary)/20 transition-colors"
-      />
-
-      {imageError && <p className="text-xs text-red-400">{imageError}</p>}
-      {compressing && (
-        <p className="text-xs text-(--text-primary)/40">
-          {tr.imageCompressing}
-        </p>
-      )}
-
-      {preview && !compressing && (
-        <div className="relative">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={preview}
-            alt="Preview"
-            className="w-full rounded-xl object-cover max-h-64"
+    <div className="panel p-3">
+      <div className="flex items-end gap-2">
+        <div className="self-start py-0.5 pl-1">
+          <Avatar
+            name={session?.user?.name ?? session?.user?.email}
+            image={session?.user?.image}
+            size={36}
           />
-          <button
-            type="button"
-            onClick={removeImage}
-            className="absolute top-2 right-2 bg-black/60 hover:bg-black/80 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs transition-colors"
-          >
-            ✕
-          </button>
         </div>
-      )}
+        <textarea
+          value={content}
+          onChange={(e) => setContent(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              if (canSubmit) handleSubmit();
+            }
+          }}
+          placeholder={tr.whatsOnYourMind}
+          aria-label={tr.whatsOnYourMind}
+          rows={1}
+          className="thin-scroll field-sizing-content max-h-48 min-h-10 min-w-0 flex-1 resize-none bg-transparent px-1 py-2 text-base outline-none placeholder:text-faint"
+        />
 
-      <div className="flex items-center justify-between">
         <label
-          className={`cursor-pointer flex items-center gap-1.5 text-sm transition-colors duration-200 ${compressing ? "text-(--text-primary)/20 pointer-events-none" : "text-(--text-primary)/30 hover:text-(--text-primary)/60"}`}
+          aria-label={tr.photo}
+          title={tr.photo}
+          className={`icon-btn ${compressing ? "pointer-events-none opacity-50" : ""}`}
         >
-          <ImagePlus className="w-5 h-5" strokeWidth={1} />
-          {tr.photo}
+          <ImagePlus className="size-5" strokeWidth={1.75} />
           <input
             type="file"
             accept="image/jpeg,image/png,image/webp,image/gif"
-            className="hidden"
+            className="sr-only"
             onChange={handleImageChange}
             disabled={compressing}
           />
@@ -206,19 +195,46 @@ const CreatePost = ({
         <button
           type="button"
           onClick={handleSubmit}
-          disabled={loading || compressing || (!content.trim() && !image)}
-          className="px-5 py-1.5 rounded-xl text-sm font-semibold text-(--text-primary) bg-(--bg-card) hover:opacity-80 disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-200"
+          disabled={!canSubmit}
+          aria-label={loading ? tr.posting : tr.post}
+          title={tr.post}
+          className="btn btn-primary size-10 shrink-0 px-0"
         >
           {loading ? (
-            <span className="flex items-center gap-2">
-              <Loader2 className="w-4.5 h-4.5 animate-spin" />
-              {tr.posting}
-            </span>
+            <Loader2 className="size-4 animate-spin" />
           ) : (
-            tr.post
+            <SendHorizontal className="size-4" />
           )}
         </button>
       </div>
+
+      {imageError && (
+        <p role="alert" className="mt-2 px-1 text-sm text-danger">
+          {imageError}
+        </p>
+      )}
+      {compressing && (
+        <p className="mt-2 px-1 text-sm text-muted">{tr.imageCompressing}</p>
+      )}
+
+      {preview && !compressing && (
+        <div className="relative mt-3">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={preview}
+            alt=""
+            className="max-h-64 w-full rounded-xl object-cover"
+          />
+          <button
+            type="button"
+            onClick={removeImage}
+            aria-label={tr.removeImage}
+            className="absolute top-2 right-2 flex size-8 cursor-pointer items-center justify-center rounded-full bg-black/60 text-white transition-colors hover:bg-black/80"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+      )}
     </div>
   );
 };

@@ -1,10 +1,13 @@
 "use client";
 
+import PageHeader from "@/app/components/shell/PageHeader";
+import Avatar from "@/app/components/ui/Avatar";
+import { EmptyText, RowSkeletons } from "@/app/components/ui/States";
 import { useLang } from "@/app/context/language";
 import { useUnreadCounts } from "@/app/hooks/useUnreadCounts";
 import { t } from "@/app/translation/translation";
 import { typeLabel, type Notification } from "@/app/types/notifications";
-import { Loader2 } from "lucide-react";
+import { CheckCheck } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
 
@@ -79,112 +82,102 @@ const Notifications = () => {
     });
 
   return (
-    <div className="min-h-screen bg-(--bg-primary) text-(--text-primary)">
-      <div className="max-w-2xl mx-auto px-4 py-8">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-lg font-semibold text-(--text-primary) flex items-center gap-2">
-              {tr.notificationsTitle}
-              {unreadCount > 0 && (
-                <span className="text-xs bg-red-500 text-white px-2 py-0.5 rounded-full">
-                  {unreadCount}
-                </span>
-              )}
-            </h1>
-            <p className="text-(--text-primary)/40 text-sm mt-0.5">
-              {tr.yourActivity}
-            </p>
-          </div>
-          {unreadCount > 0 && (
+    <>
+      <PageHeader
+        title={
+          <>
+            <span className="truncate">{tr.notificationsTitle}</span>
+            {unreadCount > 0 && <span className="count">{unreadCount}</span>}
+          </>
+        }
+        actions={
+          unreadCount > 0 && (
             <button
               onClick={markAllRead}
-              className="text-xs text-(--text-primary)/40 hover:text-(--text-primary) transition-colors"
+              aria-label={tr.markAllAsRead}
+              title={tr.markAllAsRead}
+              className="btn btn-ghost -mr-2 size-10 px-0 sm:h-9 sm:w-auto sm:px-3"
             >
-              {tr.markAllAsRead}
+              <CheckCheck className="size-5 sm:hidden" strokeWidth={1.75} />
+              <span className="hidden sm:inline">{tr.markAllAsRead}</span>
             </button>
-          )}
-        </div>
+          )
+        }
+      />
 
-        {loading ? (
-          <span className="flex items-center gap-2">
-            <Loader2 className="w-4.5 h-4.5 animate-spin" />
-            {tr.loading}
-          </span>
-        ) : notifications.length === 0 ? (
-          <div className="text-center py-12 text-(--text-primary)/20 text-sm">
-            {tr.noNotificationsYet}
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {notifications.map((n) => (
+      <div className="mx-auto max-w-2xl py-2 sm:px-4 sm:py-4">
+        <div className="panel py-1.5">
+          {loading ? (
+            <RowSkeletons count={5} avatar={40} />
+          ) : notifications.length === 0 ? (
+            <EmptyText>{tr.noNotificationsYet}</EmptyText>
+          ) : (
+            notifications.map((n) => (
               <div
                 key={n.id}
                 onClick={() => !n.read && markRead(n.id)}
-                className={`flex items-start gap-3 p-4 rounded-xl transition-colors cursor-pointer bg-(--bg-secondary) ${!n.read ? "border border-(--border)" : ""}`}
+                className={`flex items-start gap-3 px-4 py-2.5 transition-colors duration-150 ${n.read ? "" : "cursor-pointer hover:bg-raised"}`}
               >
-                <div
-                  className={`w-1.5 h-1.5 rounded-full shrink-0 mt-2 ${n.read ? "bg-transparent" : "bg-(--text-primary)"}`}
+                <Avatar
+                  name={n.sender?.name ?? n.type}
+                  image={n.sender?.image}
+                  size={40}
                 />
 
-                <div className="w-9 h-9 rounded-full bg-(--bg-card) flex items-center justify-center text-sm font-bold shrink-0 text-(--text-primary)">
-                  {n.sender?.image ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={n.sender.image}
-                      alt=""
-                      className="w-9 h-9 rounded-full object-cover shrink-0"
-                    />
-                  ) : (
-                    <div className="w-9 h-9 rounded-full bg-(--bg-card) flex items-center justify-center text-sm font-bold shrink-0 text-(--text-primary)">
-                      {n.sender?.name?.[0].toUpperCase() ??
-                        n.type[0].toUpperCase()}
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm text-(--text-primary)/80">
+                <div className="min-w-0 flex-1">
+                  <p
+                    className={`text-base ${n.read ? "text-muted" : "text-ink"}`}
+                  >
                     {n.sender && typeLabel(n.type, tr) ? (
                       <>
-                        <span className="font-semibold">{n.sender.name}</span>{" "}
+                        <span className="font-medium text-ink">
+                          {n.sender.name}
+                        </span>{" "}
                         {typeLabel(n.type, tr)}
                       </>
                     ) : (
                       n.content
                     )}
                   </p>
-                  <p className="text-xs text-(--text-primary)/30 mt-0.5">
+                  <p className="mt-0.5 text-xs text-faint">
                     {formatDate(n.createdAt)}
                   </p>
 
                   {n.type === "friend_request" && n.friendshipId && (
                     <div
-                      className="mt-3 flex gap-2"
+                      className="mt-2 flex gap-1"
                       onClick={(e) => e.stopPropagation()}
                     >
                       <button
                         onClick={() => handleFriendRequest(n, "accept")}
                         disabled={actionLoadingId === n.id}
-                        className="text-xs text-(--text-primary) font-medium px-3 py-1.5 rounded-lg bg-(--bg-card) hover:opacity-80 transition-colors disabled:opacity-50"
+                        className="btn btn-secondary h-8 px-3"
                       >
                         {tr.accept}
                       </button>
                       <button
                         onClick={() => handleFriendRequest(n, "decline")}
                         disabled={actionLoadingId === n.id}
-                        className="text-xs text-(--text-primary)/40 hover:text-red-400 px-3 py-1.5 rounded-lg hover:bg-red-500/10 transition-colors disabled:opacity-50"
+                        className="btn btn-ghost h-8 px-3"
                       >
                         {tr.decline}
                       </button>
                     </div>
                   )}
                 </div>
+
+                {!n.read && (
+                  <span
+                    aria-hidden="true"
+                    className="mt-2 size-2 shrink-0 rounded-full bg-ink"
+                  />
+                )}
               </div>
-            ))}
-          </div>
-        )}
+            ))
+          )}
+        </div>
       </div>
-    </div>
+    </>
   );
 };
 

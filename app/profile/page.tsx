@@ -1,11 +1,26 @@
 "use client";
 
 import LogoutButton from "@/app/components/profile/LogoutButton";
+import SettingRow from "@/app/components/profile/SettingRow";
+import PageHeader from "@/app/components/shell/PageHeader";
+import Avatar from "@/app/components/ui/Avatar";
+import { Dialog } from "@/app/components/ui/Dialog";
+import { Spinner } from "@/app/components/ui/States";
 import { useLang } from "@/app/context/language";
+import useTheme from "@/app/hooks/useTheme";
 import { t } from "@/app/translation/translation";
-import { Camera, Copy, Loader2 } from "lucide-react";
+import {
+  Camera,
+  Copy,
+  Info,
+  Languages,
+  Loader2,
+  Moon,
+  Pencil,
+  Sun,
+  Users,
+} from "lucide-react";
 import { useSession } from "next-auth/react";
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -13,7 +28,8 @@ const POSTS_PER_LEVEL = 5;
 
 const Profile = () => {
   const { data: session, status, update } = useSession();
-  const { lang } = useLang();
+  const { lang, toggle: toggleLang } = useLang();
+  const { theme, toggle: toggleTheme } = useTheme();
   const tr = t[lang];
   const router = useRouter();
 
@@ -45,14 +61,14 @@ const Profile = () => {
 
   if (status === "loading" || !user) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-(--bg-primary)">
-        <div className="h-6 w-6 animate-spin rounded-full border-2 border-(--border) border-t-(--text-primary)/60" />
-      </div>
+      <>
+        <PageHeader title={tr.profile} />
+        <Spinner label={tr.loading} />
+      </>
     );
   }
 
   const { posts: postsCount, reels: reelsCount } = stats;
-  const initials = (name || user.email || "?")[0].toUpperCase();
   const currentLevel = Math.floor(postsCount / POSTS_PER_LEVEL) + 1;
   const nextLevelAt =
     Math.ceil((postsCount + 1) / POSTS_PER_LEVEL) * POSTS_PER_LEVEL;
@@ -144,170 +160,174 @@ const Profile = () => {
   };
 
   return (
-    <div className="min-h-screen bg-(--bg-primary) text-(--text-primary) antialiased">
-      <div className="mx-auto w-full max-w-2xl px-4 py-10">
-        <div className="rounded-2xl border border-(--border) bg-(--bg-secondary) p-6 space-y-6">
-          <div className="flex items-start gap-4">
-            <label className="relative flex h-14 w-14 shrink-0 cursor-pointer items-center justify-center rounded-xl border border-(--border) bg-(--bg-card) text-lg font-semibold text-(--text-primary)/60 overflow-hidden group">
-              {user.image ? (
-                <Image
-                  src={user.image}
-                  width={56}
-                  height={56}
-                  className="rounded-xl object-cover w-14 h-14"
-                  alt="avatar"
-                />
-              ) : (
-                initials
-              )}
-              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-xl">
-                {avatarLoading ? (
-                  <Loader2 className="w-4 h-4 text-white animate-spin" />
-                ) : (
-                  <Camera className="w-4 h-4 text-white" />
-                )}
-              </div>
-              <input
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={handleAvatarChange}
-                disabled={avatarLoading}
-              />
-            </label>
+    <>
+      <PageHeader title={tr.profile} />
 
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-semibold text-(--text-primary)">
-                {name || tr.noName}
-              </p>
-              <p className="truncate text-xs text-(--text-primary)/30">
-                {user.email}
-              </p>
-              <p className="mt-2 inline-block rounded-md border border-(--border) px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-(--text-primary)/30">
-                {achievement}
-              </p>
-              {avatarError && (
-                <p className="mt-2 text-xs text-red-400">{avatarError}</p>
-              )}
-            </div>
-
-            <button
-              onClick={() => {
-                setNameDraft(name);
-                setNameError(null);
-                setNameMessage(null);
-                setIsModalOpen(true);
-              }}
-              className="rounded-lg border border-(--border) bg-(--bg-card) px-5 py-1 text-[10px] font-semibold uppercase tracking-wider text-(--text-primary)/80 transition hover:opacity-80"
-            >
-              {tr.changeNickname}
-            </button>
-          </div>
-
-          <button
-            onClick={handleCopyEmail}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-(--border) px-4 py-2.5 text-xs font-medium uppercase tracking-wider text-(--text-primary)/60 transition hover:bg-(--bg-card) hover:text-(--text-primary)"
+      <div className="mx-auto max-w-2xl space-y-2 py-2 sm:space-y-3 sm:px-4 sm:py-4">
+        <section className="panel flex flex-col items-center px-4 py-6 text-center">
+          <label
+            aria-label={tr.changeAvatar}
+            title={tr.changeAvatar}
+            className="group relative block cursor-pointer rounded-full focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ink"
           >
-            <Copy size={14} strokeWidth={1.5} />
-            {emailCopied ? tr.copied : tr.copyEmail}
-          </button>
-
-          <div className="grid grid-cols-2 divide-x divide-(--border) rounded-xl border border-(--border)">
-            {[
-              { value: reelsCount, label: tr.reels },
-              { value: postsCount, label: tr.posts },
-            ].map(({ value, label }) => (
-              <div key={label} className="p-3 text-center">
-                <p className="tabular-nums text-lg font-semibold text-(--text-primary)">
-                  {value}
-                </p>
-                <p className="mt-0.5 text-[9px] font-medium uppercase tracking-wider text-(--text-primary)/30">
-                  {label}
-                </p>
-              </div>
-            ))}
-          </div>
-
-          <div className="rounded-xl border border-(--border) p-4">
-            <div className="mb-2 flex items-baseline justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wide text-(--text-primary)/60">
-                {tr.level} {currentLevel}
+            <Avatar name={name || user.email} image={user.image} size={96} />
+            <span
+              className={`absolute inset-0 flex items-center justify-center rounded-full bg-black/50 text-white transition-opacity duration-150 ${avatarLoading ? "opacity-100" : "opacity-0 [@media(hover:hover)]:group-hover:opacity-100"}`}
+            >
+              {avatarLoading ? (
+                <Loader2 className="size-5 animate-spin" />
+              ) : (
+                <Camera className="size-5" />
+              )}
+            </span>
+            {!avatarLoading && (
+              <span className="absolute right-0 bottom-0 hidden size-8 items-center justify-center rounded-full border-2 border-panel bg-active text-ink [@media(hover:none)]:flex">
+                <Camera className="size-4" />
               </span>
-              <span className="text-xs tabular-nums text-(--text-primary)/30">
-                {postsCount} / {nextLevelAt} {tr.posts}
-              </span>
-            </div>
-            <div className="h-1 overflow-hidden rounded-full bg-(--border)">
-              <div
-                className="h-full bg-(--text-primary)/40 transition-[width] duration-300"
-                style={{ width: `${levelProgress}%` }}
-              />
-            </div>
-            <p className="mt-3 text-xs leading-relaxed text-(--text-primary)/30">
-              {tr.levelDesc}
+            )}
+            <input
+              type="file"
+              accept="image/*"
+              className="sr-only"
+              onChange={handleAvatarChange}
+              disabled={avatarLoading}
+            />
+          </label>
+
+          <p className="mt-3 max-w-full truncate text-xl font-medium">
+            {name || tr.noName}
+          </p>
+          <p className="max-w-full truncate text-sm text-muted">{user.email}</p>
+          <p className="mt-1 text-sm text-muted">{achievement}</p>
+          {avatarError && (
+            <p role="alert" className="mt-2 text-sm text-danger">
+              {avatarError}
             </p>
-          </div>
+          )}
+        </section>
 
-          <div className="h-px bg-(--border)" />
+        <section className="panel grid grid-cols-2 divide-x divide-line py-3">
+          {[
+            { value: reelsCount, label: tr.reels },
+            { value: postsCount, label: tr.posts },
+          ].map(({ value, label }) => (
+            <div key={label} className="text-center">
+              <p className="text-xl font-medium tabular-nums">{value}</p>
+              <p className="text-sm text-muted first-letter:uppercase">
+                {label}
+              </p>
+            </div>
+          ))}
+        </section>
+
+        <section className="panel px-4 py-3">
+          <div className="flex items-baseline justify-between gap-3">
+            <span className="text-base font-medium">
+              {tr.level} {currentLevel}
+            </span>
+            <span className="text-sm text-muted tabular-nums">
+              {postsCount} / {nextLevelAt} {tr.posts}
+            </span>
+          </div>
+          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-active">
+            <div
+              className="h-full rounded-full bg-ink transition-[width] duration-300"
+              style={{ width: `${levelProgress}%` }}
+            />
+          </div>
+          <p className="mt-2 text-sm text-muted">{tr.levelDesc}</p>
+        </section>
+
+        <section className="panel overflow-hidden py-1.5">
+          <SettingRow
+            icon={Pencil}
+            label={tr.changeNickname}
+            value={name}
+            onClick={() => {
+              setNameDraft(name);
+              setNameError(null);
+              setNameMessage(null);
+              setIsModalOpen(true);
+            }}
+          />
+          <SettingRow
+            icon={Copy}
+            label={emailCopied ? tr.copied : tr.copyEmail}
+            onClick={handleCopyEmail}
+          />
+          <div className="md:hidden">
+            <SettingRow icon={Users} label={tr.friends} href="/friends" />
+            <SettingRow
+              icon={Languages}
+              label={tr.language}
+              value={tr.languageName}
+              onClick={toggleLang}
+            />
+            <SettingRow
+              icon={theme === "dark" ? Moon : Sun}
+              label={tr.theme}
+              value={theme === "dark" ? tr.themeDark : tr.themeLight}
+              onClick={toggleTheme}
+            />
+            <SettingRow icon={Info} label={tr.about} href="/about" />
+          </div>
+        </section>
+
+        <section className="panel overflow-hidden py-1.5">
           <LogoutButton />
-        </div>
+        </section>
       </div>
 
       {isModalOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4"
-          onClick={() => {
+        <Dialog
+          title={tr.changeNicknameTitle}
+          onClose={() => {
             if (!nameSaving) setIsModalOpen(false);
           }}
         >
-          <div
-            className="w-full max-w-md rounded-2xl border border-(--border) bg-(--bg-secondary) p-5"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <p className="mb-1 text-sm font-semibold text-(--text-primary)">
-              {tr.changeNicknameTitle}
+          <p className="mt-1 text-sm text-muted">{tr.changeNicknameDesc}</p>
+          <input
+            type="text"
+            value={nameDraft}
+            maxLength={30}
+            placeholder={tr.enterNickname}
+            aria-label={tr.enterNickname}
+            autoFocus
+            onChange={(e) => {
+              setNameDraft(e.target.value);
+              setNameError(null);
+              setNameMessage(null);
+            }}
+            onKeyDown={(e) => e.key === "Enter" && handleSaveName()}
+            className="field mt-4"
+          />
+          {nameError && (
+            <p role="alert" className="mt-2 text-sm text-danger">
+              {nameError}
             </p>
-            <p className="mb-4 text-xs text-(--text-primary)/40">
-              {tr.changeNicknameDesc}
-            </p>
-            <input
-              type="text"
-              value={nameDraft}
-              maxLength={30}
-              placeholder={tr.enterNickname}
-              onChange={(e) => {
-                setNameDraft(e.target.value);
-                setNameError(null);
-                setNameMessage(null);
-              }}
-              className="w-full rounded-xl border border-(--border) bg-(--bg-primary) px-3 py-2 text-sm text-(--text-primary) placeholder:text-(--text-primary)/25 outline-none transition focus:border-(--text-primary)/30"
-            />
-            {nameError && (
-              <p className="mt-2 text-xs text-red-400">{nameError}</p>
-            )}
-            {!nameError && nameMessage && (
-              <p className="mt-2 text-xs text-emerald-500">{nameMessage}</p>
-            )}
-            <div className="mt-4 flex justify-end gap-2">
-              <button
-                disabled={nameSaving}
-                onClick={() => setIsModalOpen(false)}
-                className="rounded-xl border border-(--border) px-4 py-2 text-xs font-semibold uppercase tracking-wider text-(--text-primary)/60 transition hover:bg-(--bg-card) disabled:opacity-50"
-              >
-                {tr.cancel}
-              </button>
-              <button
-                onClick={handleSaveName}
-                disabled={nameSaving}
-                className="rounded-xl border border-(--border) bg-(--bg-card) px-4 py-2 text-xs font-semibold uppercase tracking-wider text-(--text-primary)/80 transition hover:opacity-80 disabled:opacity-50"
-              >
-                {nameSaving ? tr.saving : tr.save}
-              </button>
-            </div>
+          )}
+          {!nameError && nameMessage && (
+            <p className="mt-2 text-sm text-muted">{nameMessage}</p>
+          )}
+          <div className="mt-5 flex justify-end gap-1">
+            <button
+              disabled={nameSaving}
+              onClick={() => setIsModalOpen(false)}
+              className="btn btn-ghost"
+            >
+              {tr.cancel}
+            </button>
+            <button
+              onClick={handleSaveName}
+              disabled={nameSaving}
+              className="btn btn-primary"
+            >
+              {nameSaving ? tr.saving : tr.save}
+            </button>
           </div>
-        </div>
+        </Dialog>
       )}
-    </div>
+    </>
   );
 };
 

@@ -1,5 +1,9 @@
 "use client";
 
+import PageHeader from "@/app/components/shell/PageHeader";
+import Avatar from "@/app/components/ui/Avatar";
+import { ConfirmDialog } from "@/app/components/ui/Dialog";
+import { EmptyText, RowSkeletons } from "@/app/components/ui/States";
 import { useSession } from "next-auth/react";
 import { useLang } from "@/app/context/language";
 import { t } from "@/app/translation/translation";
@@ -10,28 +14,11 @@ import type {
   Tab,
   FriendToRemove,
 } from "@/app/types/friends";
-import Image from "next/image";
+import { Loader2, Search } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-const Avatar = ({
-  user,
-}: {
-  user: { name: string | null; image: string | null };
-}) =>
-  user.image ? (
-    <Image
-      src={user.image}
-      width={40}
-      height={40}
-      className="rounded-full object-cover w-10 h-10 shrink-0"
-      alt={user.name ?? ""}
-    />
-  ) : (
-    <div className="w-10 h-10 rounded-full bg-(--bg-card) flex items-center justify-center text-sm font-bold shrink-0 text-(--text-primary)">
-      {(user.name ?? "?")[0].toUpperCase()}
-    </div>
-  );
+const ROW_CLASS = "flex items-center gap-3 px-4 py-2.5";
 
 const Friends = () => {
   const { data: session } = useSession();
@@ -41,6 +28,7 @@ const Friends = () => {
   const [tab, setTab] = useState<Tab>("friends");
   const [friends, setFriends] = useState<Friendship[]>([]);
   const [requests, setRequests] = useState<Friendship[]>([]);
+  const [loaded, setLoaded] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<SearchUser[]>([]);
   const [searching, setSearching] = useState(false);
@@ -56,10 +44,12 @@ const Friends = () => {
     Promise.all([
       fetch("/api/friends").then((r) => r.json()),
       fetch("/api/friends/requests").then((r) => r.json()),
-    ]).then(([fr, rq]: [Friendship[], Friendship[]]) => {
-      setFriends(fr);
-      setRequests(rq);
-    });
+    ])
+      .then(([fr, rq]: [Friendship[], Friendship[]]) => {
+        setFriends(fr);
+        setRequests(rq);
+      })
+      .finally(() => setLoaded(true));
   }, [currentUserId]);
 
   const friendOf = (f: Friendship): FriendUser =>
@@ -120,67 +110,64 @@ const Friends = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-(--bg-primary) text-(--text-primary)">
-      <div className="max-w-2xl mx-auto px-4 py-8">
-        <div className="mb-6">
-          <h1 className="text-lg font-semibold text-(--text-primary)">
-            {tr.friendsTitle}
-          </h1>
-          <p className="text-(--text-primary)/40 text-sm mt-0.5">
-            {tr.manageConnections}
-          </p>
-        </div>
-
-        <div className="flex gap-1 bg-(--bg-secondary) rounded-xl p-1 mb-6">
+    <>
+      <PageHeader title={tr.friendsTitle}>
+        <div
+          role="tablist"
+          className="no-scrollbar flex overflow-x-auto [justify-content:safe_center]"
+        >
           {tabs.map((item) => (
             <button
               key={item.id}
+              role="tab"
+              aria-selected={tab === item.id}
               onClick={() => setTab(item.id)}
-              className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${tab === item.id ? "bg-(--bg-card) text-(--text-primary)" : "text-(--text-primary)/40 hover:text-(--text-primary)"}`}
+              className={`tab ${tab === item.id ? "tab-active" : ""}`}
             >
               {item.label}
               {item.count !== undefined && item.count > 0 && (
-                <span className="text-xs px-1.5 py-0.5 rounded-full bg-(--text-primary)/10">
+                <span className="text-xs font-normal text-muted tabular-nums">
                   {item.count}
                 </span>
               )}
             </button>
           ))}
         </div>
+      </PageHeader>
 
+      <div className="mx-auto max-w-2xl py-2 sm:px-4 sm:py-4">
         {tab === "friends" && (
-          <div className="space-y-2">
-            {friends.length === 0 ? (
-              <div className="text-center py-12 text-(--text-primary)/20 text-sm">
-                {tr.noFriendsYet}
-              </div>
+          <div className="panel py-1.5">
+            {!loaded ? (
+              <RowSkeletons />
+            ) : friends.length === 0 ? (
+              <EmptyText>{tr.noFriendsYet}</EmptyText>
             ) : (
               friends.map((f) => {
                 const friend = friendOf(f);
                 return (
-                  <div
-                    key={f.id}
-                    className="flex items-center gap-3 p-4 rounded-xl bg-(--bg-secondary)"
-                  >
+                  <div key={f.id} className={ROW_CLASS}>
                     <Link href={`/profile/${friend.id}`} className="shrink-0">
-                      <Avatar user={friend} />
+                      <Avatar
+                        name={friend.name}
+                        image={friend.image}
+                        size={48}
+                      />
                     </Link>
-                    <div className="flex-1 min-w-0">
+                    <div className="min-w-0 flex-1">
                       <Link
                         href={`/profile/${friend.id}`}
-                        className="block text-sm font-medium text-(--text-primary) truncate hover:underline"
+                        className="block truncate text-base font-medium hover:underline"
                       >
                         {friend.name}
                       </Link>
-                      <p className="text-xs text-(--text-primary)/30">
-                        {tr.friend}
-                      </p>
+                      <p className="text-sm text-muted">{tr.friend}</p>
                     </div>
                     <button
                       onClick={() =>
                         setFriendToRemove({ id: f.id, name: friend.name })
                       }
-                      className="text-xs text-(--text-primary)/30 hover:text-red-400 transition-colors px-3 py-1.5 rounded-lg hover:bg-red-500/10"
+                      className="btn btn-ghost"
                     >
                       {tr.remove}
                     </button>
@@ -192,38 +179,39 @@ const Friends = () => {
         )}
 
         {tab === "requests" && (
-          <div className="space-y-2">
-            {requests.length === 0 ? (
-              <div className="text-center py-12 text-(--text-primary)/20 text-sm">
-                {tr.noPendingRequests}
-              </div>
+          <div className="panel py-1.5">
+            {!loaded ? (
+              <RowSkeletons count={2} />
+            ) : requests.length === 0 ? (
+              <EmptyText>{tr.noPendingRequests}</EmptyText>
             ) : (
               requests.map((r) => (
-                <div
-                  key={r.id}
-                  className="flex items-center gap-3 p-4 rounded-xl bg-(--bg-secondary)"
-                >
-                  <Avatar user={r.sender} />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-(--text-primary) truncate">
+                <div key={r.id} className={ROW_CLASS}>
+                  <Avatar
+                    name={r.sender.name}
+                    image={r.sender.image}
+                    size={48}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-base font-medium">
                       {r.sender.name}
                     </p>
-                    <p className="text-xs text-(--text-primary)/30">
+                    <p className="truncate text-sm text-muted">
                       {tr.wantsToBeFriends}
                     </p>
                   </div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => acceptRequest(r.id)}
-                      className="text-xs text-(--text-primary) font-medium px-3 py-1.5 rounded-lg bg-(--bg-card) hover:opacity-80 transition-colors"
-                    >
-                      {tr.accept}
-                    </button>
+                  <div className="flex shrink-0 gap-1">
                     <button
                       onClick={() => rejectRequest(r.id)}
-                      className="text-xs text-(--text-primary)/40 hover:text-red-400 px-3 py-1.5 rounded-lg hover:bg-red-500/10 transition-colors"
+                      className="btn btn-ghost px-3"
                     >
                       {tr.decline}
+                    </button>
+                    <button
+                      onClick={() => acceptRequest(r.id)}
+                      className="btn btn-secondary px-3"
+                    >
+                      {tr.accept}
                     </button>
                   </div>
                 </div>
@@ -233,84 +221,75 @@ const Friends = () => {
         )}
 
         {tab === "search" && (
-          <div className="space-y-4">
-            <div className="flex gap-2">
-              <input
-                type="text"
-                placeholder={tr.searchByUsername}
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-                className="flex-1 bg-(--bg-secondary) border border-(--border) focus:border-(--text-primary)/20 rounded-xl px-4 py-2.5 text-sm text-(--text-primary) placeholder:text-(--text-primary)/20 outline-none transition-colors"
-              />
+          <div className="panel">
+            <div className="flex items-center gap-2 p-3">
+              <div className="relative min-w-0 flex-1">
+                <Search
+                  className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-faint"
+                  strokeWidth={1.75}
+                />
+                <input
+                  type="text"
+                  placeholder={tr.searchByUsername}
+                  aria-label={tr.searchByUsername}
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+                  className="field h-10 rounded-full pl-10"
+                />
+              </div>
               <button
                 onClick={handleSearch}
                 disabled={searching}
-                className="px-4 py-2.5 rounded-xl bg-(--bg-card) hover:opacity-80 text-sm font-medium text-(--text-primary) transition-colors disabled:opacity-50"
+                className="btn btn-primary h-10"
               >
-                {searching ? "..." : tr.search}
+                {searching ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  tr.search
+                )}
               </button>
             </div>
-            <div className="space-y-2">
-              {searchResults.map((u) => (
-                <div
-                  key={u.id}
-                  className="flex items-center gap-3 p-4 rounded-xl bg-(--bg-secondary)"
-                >
-                  <Avatar user={u} />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-(--text-primary) truncate">
+            {searchResults.length > 0 && (
+              <div className="pb-1.5">
+                {searchResults.map((u) => (
+                  <div key={u.id} className={ROW_CLASS}>
+                    <Avatar name={u.name} image={u.image} size={48} />
+                    <p className="min-w-0 flex-1 truncate text-base font-medium">
                       {u.name}
                     </p>
+                    <button
+                      onClick={() => sendRequest(u.id)}
+                      disabled={u.relationStatus !== "none"}
+                      className="btn btn-secondary"
+                    >
+                      {u.relationStatus === "pending"
+                        ? tr.requestSent
+                        : u.relationStatus === "accepted"
+                          ? tr.alreadyFriends
+                          : tr.addFriend}
+                    </button>
                   </div>
-                  <button
-                    onClick={() => sendRequest(u.id)}
-                    disabled={u.relationStatus !== "none"}
-                    className="text-xs text-(--text-primary) font-medium px-3 py-1.5 rounded-lg bg-(--bg-card) hover:opacity-80 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-                  >
-                    {u.relationStatus === "pending"
-                      ? tr.requestSent
-                      : u.relationStatus === "accepted"
-                        ? tr.alreadyFriends
-                        : tr.addFriend}
-                  </button>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>
 
       {friendToRemove && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
-          <div className="w-full max-w-md rounded-2xl border border-(--border) bg-(--bg-secondary) p-5 shadow-2xl">
-            <h2 className="text-base font-semibold text-(--text-primary)">
-              {tr.removeFriend}
-            </h2>
-            <p className="mt-2 text-sm text-(--text-primary)/60">
-              {tr.removeFriendDesc} {friendToRemove.name}{" "}
-              {tr.removeFriendDescEnd}
-            </p>
-            <div className="mt-5 flex justify-end gap-2">
-              <button
-                onClick={() => setFriendToRemove(null)}
-                disabled={removingFriend}
-                className="px-3 py-1.5 rounded-lg text-sm text-(--text-primary)/60 hover:bg-(--bg-card) transition-colors disabled:opacity-60"
-              >
-                {tr.cancel}
-              </button>
-              <button
-                onClick={removeFriend}
-                disabled={removingFriend}
-                className="px-3 py-1.5 rounded-lg text-sm font-medium text-white bg-red-500/80 hover:bg-red-500 transition-colors disabled:opacity-60"
-              >
-                {removingFriend ? tr.removing : tr.remove}
-              </button>
-            </div>
-          </div>
-        </div>
+        <ConfirmDialog
+          title={tr.removeFriend}
+          description={`${tr.removeFriendDesc} ${friendToRemove.name} ${tr.removeFriendDescEnd}`}
+          confirmLabel={tr.remove}
+          cancelLabel={tr.cancel}
+          pendingLabel={tr.removing}
+          pending={removingFriend}
+          onConfirm={removeFriend}
+          onCancel={() => setFriendToRemove(null)}
+        />
       )}
-    </div>
+    </>
   );
 };
 

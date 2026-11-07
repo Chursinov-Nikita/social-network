@@ -1,22 +1,24 @@
 "use client";
 
+import Avatar from "@/app/components/ui/Avatar";
+import { ConfirmDialog } from "@/app/components/ui/Dialog";
 import { useLang } from "@/app/context/language";
 import { t } from "@/app/translation/translation";
 import { PAGE_SIZE, type GroupChat, type Message } from "@/app/types/chat";
 import {
+  ChevronLeft,
   EllipsisVertical,
-  Loader2,
+  LogOut,
   MicIcon,
-  Smile,
+  SendHorizontal,
   Square,
   Trash2,
-  Users,
   XCircle,
 } from "lucide-react";
 import { useSession } from "next-auth/react";
-import Image from "next/image";
-import { useEffect, useRef, useState } from "react";
-import { EMOJI_CATEGORIES } from "./emoji";
+import { Fragment, useEffect, useRef, useState } from "react";
+import Bubble, { DayChip, getRunInfo } from "./Bubble";
+import EmojiPicker from "./EmojiPicker";
 import { mergeLatestPage } from "./mergeLatestPage";
 
 const POLL_INTERVAL_MS = 5000;
@@ -27,11 +29,13 @@ const GroupChatWindow = ({
   groupName,
   groupAvatar,
   onLeave,
+  onBack,
 }: {
   groupId: string;
   groupName: string;
   groupAvatar: string | null;
   onLeave: () => void;
+  onBack?: () => void;
 }) => {
   const { data: session } = useSession();
   const { lang } = useLang();
@@ -48,14 +52,11 @@ const GroupChatWindow = ({
   );
   const [deletingMsg, setDeletingMsg] = useState(false);
   const [group, setGroup] = useState<GroupChat | null>(null);
-  const [showEmoji, setShowEmoji] = useState(false);
-  const [activeCat, setActiveCat] = useState(0);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [showMenu, setShowMenu] = useState(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
-  const emojiRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -95,16 +96,6 @@ const GroupChatWindow = ({
     const c = containerRef.current;
     if (c) c.scrollTo({ top: c.scrollHeight, behavior: "smooth" });
   }, [messages]);
-
-  useEffect(() => {
-    if (!showEmoji) return;
-    const handler = (e: MouseEvent) => {
-      if (emojiRef.current && !emojiRef.current.contains(e.target as Node))
-        setShowEmoji(false);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [showEmoji]);
 
   useEffect(() => {
     if (!showMenu) return;
@@ -203,7 +194,9 @@ const GroupChatWindow = ({
       };
       recorder.onstop = async () => {
         stream.getTracks().forEach((t) => t.stop());
-        const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+        const blob = new Blob(audioChunksRef.current, {
+          type: recorder.mimeType || "audio/webm",
+        });
         await sendAudioMessage(blob);
       };
       recorder.start();
@@ -278,272 +271,226 @@ const GroupChatWindow = ({
   };
 
   return (
-    <div className="flex flex-col h-full overflow-hidden bg-(--bg-primary)">
-      <div className="bg-(--bg-primary) border-b border-(--border)">
-        <div className="relative flex items-center gap-3 px-4 py-3.5">
-          <div className="w-9 h-9 rounded-full bg-blue-500/20 flex items-center justify-center text-sm font-bold text-blue-400 shrink-0">
-            {groupAvatar ? (
-              <Image
-                src={groupAvatar}
-                width={36}
-                height={36}
-                className="rounded-full object-cover"
-                alt={groupName}
-              />
-            ) : (
-              <Users className="w-5 h-5 text-blue-400" />
-            )}
-          </div>
-          <div className="flex flex-col min-w-0">
-            <p className="flex-1 text-md font-semibold text-(--text-primary) truncate">
-              {groupName}
-            </p>
-            <p className="text-xs text-(--text-primary)/30">
+    <div className="flex h-full flex-col overflow-hidden">
+      <header className="relative z-20 flex h-14 shrink-0 items-center gap-1 border-b border-line bg-panel px-2 md:px-4">
+        {onBack && (
+          <button
+            onClick={onBack}
+            aria-label={tr.back}
+            className="icon-btn md:hidden"
+          >
+            <ChevronLeft className="size-6" strokeWidth={1.75} />
+          </button>
+        )}
+
+        <div className="flex min-w-0 flex-1 items-center gap-3">
+          <Avatar name={groupName} image={groupAvatar} size={40} group />
+          <div className="min-w-0">
+            <p className="truncate text-base font-medium">{groupName}</p>
+            <p className="truncate text-xs text-muted">
               {tr.membersCount(group?.members?.length ?? 0)}
             </p>
           </div>
+        </div>
 
-          <div className="absolute right-4 top-4" ref={menuRef}>
-            <button
-              onClick={() => setShowMenu((p) => !p)}
-              className="w-8 h-8 rounded-xl flex items-center justify-center text-(--text-primary)/40 hover:text-(--text-primary) hover:bg-(--bg-card) transition-colors"
-            >
-              <EllipsisVertical className="w-5 h-5" />
-            </button>
-            {showMenu && (
-              <div className="absolute right-0 top-10 z-30 bg-(--bg-secondary) border border-(--border) rounded-xl p-1 shadow-xl min-w-48">
+        <div className="relative" ref={menuRef}>
+          <button
+            onClick={() => setShowMenu((p) => !p)}
+            aria-label={tr.moreActions}
+            aria-expanded={showMenu}
+            className="icon-btn"
+          >
+            <EllipsisVertical className="size-5" strokeWidth={1.75} />
+          </button>
+          {showMenu && (
+            <div className="menu absolute top-11 right-0">
+              <button
+                className="menu-item"
+                onClick={async () => {
+                  await fetch(`/api/groups/${groupId}/members`, {
+                    method: "DELETE",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ userId: currentUserId }),
+                  });
+                  setShowMenu(false);
+                  onLeave();
+                }}
+              >
+                <LogOut className="size-4" />
+                {tr.leaveGroup}
+              </button>
+
+              {group?.createdBy === currentUserId && (
                 <button
-                  className="w-full flex items-center gap-2 px-3 py-2 text-xs text-(--text-primary)/70 hover:bg-(--bg-card) rounded-lg transition-colors text-left"
+                  className="menu-item menu-item-danger"
                   onClick={async () => {
-                    await fetch(`/api/groups/${groupId}/members`, {
+                    await fetch(`/api/groups/${groupId}`, {
                       method: "DELETE",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ userId: currentUserId }),
                     });
                     setShowMenu(false);
                     onLeave();
                   }}
                 >
-                  {tr.leaveGroup}
+                  <Trash2 className="size-4" />
+                  {tr.deleteGroup}
                 </button>
-
-                {group?.createdBy === currentUserId && (
-                  <button
-                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-red-400 hover:bg-red-500/10 rounded-lg transition-colors text-left"
-                    onClick={async () => {
-                      await fetch(`/api/groups/${groupId}`, {
-                        method: "DELETE",
-                      });
-                      setShowMenu(false);
-                      onLeave();
-                    }}
-                  >
-                    {tr.deleteGroup}
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
+              )}
+            </div>
+          )}
         </div>
-      </div>
+      </header>
 
       <div
         ref={containerRef}
-        className="flex-1 min-h-0 overflow-y-auto px-4 py-4 space-y-1 [scrollbar-width:thin] [scrollbar-color:var(--border)_transparent]"
+        className="thin-scroll min-h-0 flex-1 overflow-y-auto"
       >
-        {hasMore && (
-          <div className="flex justify-center pb-3">
+        <div className="mx-auto flex w-full max-w-3xl flex-col px-3 py-3 md:px-6">
+          {hasMore && (
             <button
               onClick={loadOlder}
               disabled={loadingOlder}
-              className="text-xs px-3 py-1.5 rounded-full bg-(--bg-secondary) text-(--text-primary)/80 hover:bg-(--bg-card) disabled:opacity-40 transition-colors"
+              className="btn btn-secondary mb-2 h-8 self-center text-xs"
             >
               {loadingOlder ? tr.loading : tr.loadOlderMessages}
             </button>
-          </div>
-        )}
+          )}
 
-        {messages.map((msg) => {
-          const isMe = msg.senderId === currentUserId;
-          const isAudio = msg.type === "audio";
-          const senderName = msg.sender?.name ?? "";
+          {messages.map((msg, index) => {
+            const isMe = msg.senderId === currentUserId;
+            const isAudio = msg.type === "audio";
+            const senderName = msg.sender?.name ?? "";
+            const time = new Date(msg.createdAt).toLocaleTimeString(lang, {
+              hour: "2-digit",
+              minute: "2-digit",
+            });
+            const { startsDay, startsRun, endsRun } = getRunInfo(
+              messages,
+              index,
+            );
 
-          return (
-            <div
-              key={msg.id}
-              className={`flex ${isMe ? "justify-end" : "justify-start"} group/msg`}
-              onMouseEnter={() => setHoveredMsg(msg.id)}
-              onMouseLeave={() => setHoveredMsg(null)}
-            >
-              <div className="flex items-end gap-1">
-                {isMe && hoveredMsg === msg.id && (
-                  <button
-                    onClick={() => setPendingDeleteMsgId(msg.id)}
-                    className="w-6 h-6 rounded-full bg-(--bg-secondary) flex items-center justify-center text-(--text-primary)/30 hover:text-red-400 transition-colors mb-1 shrink-0"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                )}
-                <div className={isAudio ? "" : "max-w-xs"}>
-                  {!isMe && (
-                    <p className="text-[10px] text-(--text-primary)/40 mb-0.5 px-1">
-                      {senderName}
-                    </p>
-                  )}
-                  <div
-                    className={`px-3 py-2.5 rounded-2xl text-sm leading-relaxed text-(--text-primary) ${isMe ? "bg-(--bg-card) rounded-br-sm" : "bg-(--bg-secondary) rounded-bl-sm"}`}
-                  >
-                    {isAudio ? (
-                      <audio controls src={msg.content} className="h-9" />
-                    ) : (
-                      <p>{msg.content}</p>
+            return (
+              <Fragment key={msg.id}>
+                {startsDay && <DayChip date={msg.createdAt} lang={lang} />}
+                <div
+                  className={`flex ${isMe ? "justify-end" : "justify-start"} ${startsRun ? "mt-2" : "mt-0.5"}`}
+                  onMouseEnter={() => setHoveredMsg(msg.id)}
+                  onMouseLeave={() => setHoveredMsg(null)}
+                >
+                  <div className="flex max-w-[85%] items-end gap-1 md:max-w-[75%]">
+                    {isMe && hoveredMsg === msg.id && (
+                      <button
+                        onClick={() => setPendingDeleteMsgId(msg.id)}
+                        aria-label={tr.deleteThisMessage}
+                        className="icon-btn size-7 bg-panel hover:text-danger"
+                      >
+                        <Trash2 className="size-3.5" />
+                      </button>
                     )}
-                    <p className="text-[10px] mt-1 text-right text-(--text-primary)/30">
-                      {new Date(msg.createdAt).toLocaleTimeString(lang, {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </p>
+                    <Bubble
+                      isMe={isMe}
+                      tail={endsRun}
+                      time={time}
+                      text={isAudio ? undefined : msg.content}
+                      className={isAudio ? "pb-6" : ""}
+                    >
+                      {!isMe && startsRun && (
+                        <p className="text-sm font-medium">{senderName}</p>
+                      )}
+                      {isAudio && (
+                        <audio
+                          controls
+                          src={msg.content}
+                          className="h-10 max-w-full"
+                        />
+                      )}
+                    </Bubble>
                   </div>
                 </div>
-              </div>
-            </div>
-          );
-        })}
+              </Fragment>
+            );
+          })}
+        </div>
       </div>
 
-      <div className="py-5 px-3">
-        {isRecording ? (
-          <div className="flex items-center gap-3 bg-(--bg-secondary) rounded-full px-4 py-2.5">
-            <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse shrink-0" />
-            <span className="text-sm text-(--text-primary) flex-1 tabular-nums">
-              {formatRecordingTime(recordingTime)}
-            </span>
-            <button
-              onClick={cancelRecording}
-              className="text-(--text-primary)/40 hover:text-red-400 transition-colors p-1"
-            >
-              <XCircle className="w-5 h-5" />
-            </button>
-            <button
-              onClick={stopRecording}
-              className="bg-red-500 hover:bg-red-600 rounded-full p-1.5 transition-colors"
-            >
-              <Square className="w-3.5 h-3.5 fill-white text-white" />
-            </button>
-          </div>
-        ) : (
-          <div className="flex items-end gap-1">
-            <div ref={emojiRef} className="relative">
+      <div className="shrink-0 px-3 pt-1 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:px-6 md:pb-4">
+        <div className="mx-auto max-w-3xl">
+          {isRecording ? (
+            <div className="flex h-11 items-center gap-3 rounded-2xl bg-panel pr-1 pl-4">
+              <span className="size-2 shrink-0 animate-pulse rounded-full bg-danger" />
+              <span className="flex-1 text-base tabular-nums">
+                {formatRecordingTime(recordingTime)}
+              </span>
               <button
-                onClick={() => setShowEmoji((p) => !p)}
-                className="bg-(--bg-secondary) rounded-full p-2.5 transition-colors hover:bg-(--bg-card)"
+                onClick={cancelRecording}
+                aria-label={tr.cancelRecording}
+                className="icon-btn size-9 hover:text-danger"
               >
-                <Smile className="w-6 h-6 text-(--text-primary)/85" />
+                <XCircle className="size-5" strokeWidth={1.75} />
               </button>
-              {showEmoji && (
-                <div className="absolute bottom-14 left-0 z-30 bg-(--bg-secondary) border border-(--border) rounded-2xl shadow-2xl w-72 overflow-hidden">
-                  <div className="flex border-b border-(--border)">
-                    {EMOJI_CATEGORIES.map((cat, i) => (
-                      <button
-                        key={cat.label.en}
-                        onClick={() => setActiveCat(i)}
-                        className={`flex-1 py-2 text-[11px] font-medium transition-colors ${
-                          activeCat === i
-                            ? "text-(--text-primary) border-b-2 border-(--text-primary) -mb-px"
-                            : "text-(--text-primary)/40 hover:text-(--text-primary)/70"
-                        }`}
-                      >
-                        {cat.emojis[0]}
-                      </button>
-                    ))}
-                  </div>
-                  <p className="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-(--text-primary)/30">
-                    {EMOJI_CATEGORIES[activeCat].label[lang]}
-                  </p>
-                  <div className="grid grid-cols-8 gap-px px-2 pb-2">
-                    {EMOJI_CATEGORIES[activeCat].emojis.map((emoji) => (
-                      <button
-                        key={emoji}
-                        onClick={() => {
-                          setContent((prev) => prev + emoji);
-                          setShowEmoji(false);
-                        }}
-                        className="aspect-square flex items-center justify-center text-2xl hover:bg-(--bg-card) rounded-xl transition-colors"
-                      >
-                        {emoji}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+              <button
+                onClick={stopRecording}
+                aria-label={tr.stopRecording}
+                className="btn btn-primary size-9 shrink-0 px-0"
+              >
+                <Square className="size-3.5 fill-current" />
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-end gap-2">
+              <div className="flex min-w-0 flex-1 items-end rounded-2xl bg-panel">
+                <EmojiPicker
+                  onPick={(emoji) => setContent((prev) => prev + emoji)}
+                />
+                <textarea
+                  value={content}
+                  onChange={(e) => setContent(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      if (isRecording) stopRecording();
+                      else void sendMessage();
+                    }
+                  }}
+                  placeholder={tr.writeMessage}
+                  aria-label={tr.writeMessage}
+                  rows={1}
+                  className="thin-scroll field-sizing-content max-h-40 min-h-11 min-w-0 flex-1 resize-none bg-transparent py-[11px] pr-3 text-base outline-none placeholder:text-faint"
+                />
+              </div>
+
+              {content.trim() ? (
+                <button
+                  onClick={() => void sendMessage()}
+                  aria-label={tr.send}
+                  className="btn btn-primary size-11 shrink-0 px-0"
+                >
+                  <SendHorizontal className="size-5" />
+                </button>
+              ) : (
+                <button
+                  onClick={startRecording}
+                  aria-label={tr.recordVoice}
+                  className="icon-btn size-11 bg-panel"
+                >
+                  <MicIcon className="size-5" strokeWidth={1.75} />
+                </button>
               )}
             </div>
-
-            <textarea
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  if (isRecording) stopRecording();
-                  else void sendMessage();
-                }
-              }}
-              placeholder={tr.writeMessage}
-              rows={1}
-              className="flex-1 bg-(--bg-secondary) rounded-full px-4.5 py-2.5 text-md text-(--text-primary) placeholder:text-(--text-primary)/90 resize-none focus:outline-none transition-colors"
-            />
-
-            <button
-              onClick={startRecording}
-              className="bg-(--bg-secondary) rounded-full p-2.5 transition-colors hover:bg-(--bg-card)"
-            >
-              <MicIcon className="w-6 h-6 text-(--text-primary)/85" />
-            </button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {pendingDeleteMsgId && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4"
-          onClick={() => !deletingMsg && setPendingDeleteMsgId(null)}
-        >
-          <div
-            className="w-full max-w-md rounded-2xl border border-(--border) bg-(--bg-secondary) p-5 shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 className="text-base font-semibold text-(--text-primary)">
-              {tr.deleteThisMessage}
-            </h2>
-            <p className="mt-2 text-sm text-(--text-primary)/60">
-              {tr.deleteThisMessageDesc}
-            </p>
-            <div className="mt-5 flex justify-end gap-2">
-              <button
-                onClick={() => setPendingDeleteMsgId(null)}
-                disabled={deletingMsg}
-                className="px-3 py-1.5 rounded-lg text-sm text-(--text-primary)/60 hover:bg-(--bg-card) transition-colors disabled:opacity-40"
-              >
-                {tr.cancel}
-              </button>
-              <button
-                onClick={confirmDeleteMessage}
-                disabled={deletingMsg}
-                className="px-3 py-1.5 rounded-lg text-sm font-medium text-white bg-red-500/80 hover:bg-red-500 transition-colors disabled:opacity-50 flex items-center gap-2"
-              >
-                {deletingMsg ? (
-                  <>
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    {tr.deleting}
-                  </>
-                ) : (
-                  tr.delete
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
+        <ConfirmDialog
+          title={tr.deleteThisMessage}
+          description={tr.deleteThisMessageDesc}
+          confirmLabel={tr.delete}
+          cancelLabel={tr.cancel}
+          pendingLabel={tr.deleting}
+          pending={deletingMsg}
+          onConfirm={confirmDeleteMessage}
+          onCancel={() => setPendingDeleteMsgId(null)}
+        />
       )}
     </div>
   );

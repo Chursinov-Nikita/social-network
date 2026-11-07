@@ -1,4 +1,5 @@
 "use client";
+import PageHeader from "@/app/components/shell/PageHeader";
 import { useLang } from "@/app/context/language";
 import { t } from "@/app/translation/translation";
 import type { Post } from "@/app/types/feed";
@@ -40,17 +41,9 @@ const Feed = ({ initialPosts = [] }: { initialPosts: Post[] }) => {
   };
 
   return (
-    <div className="min-h-screen bg-(--bg-primary)">
-      <div className="max-w-2xl mx-auto px-4 py-8 space-y-3">
-        <div className="mb-4">
-          <h1 className="text-lg font-semibold text-(--text-primary)">
-            {tr.feed}
-          </h1>
-          <p className="text-(--text-primary)/40 text-sm mt-0.5">
-            {tr.feedSubtitle}
-          </p>
-        </div>
-
+    <>
+      <PageHeader title={tr.feed} />
+      <div className="mx-auto max-w-2xl space-y-2 py-2 sm:space-y-3 sm:px-4 sm:py-4">
         <CreatePost
           onPostCreated={(newPost) => setPosts((prev) => [newPost, ...prev])}
         />
@@ -82,13 +75,13 @@ const Feed = ({ initialPosts = [] }: { initialPosts: Post[] }) => {
         <button
           onClick={loadMore}
           disabled={loading || !hasMore}
-          className="w-full py-2.5 rounded-xl text-sm text-(--text-primary)/40 hover:text-(--text-primary) hover:bg-(--bg-secondary) disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-200"
+          className={`flex h-11 w-full items-center justify-center gap-2 rounded-xl text-sm text-muted transition-colors ${hasMore ? "cursor-pointer hover:bg-panel hover:text-ink" : ""}`}
         >
           {loading ? (
-            <span className="flex items-center justify-center gap-2">
-              <Loader2 className="w-4.5 h-4.5 animate-spin" />
+            <>
+              <Loader2 className="size-4 animate-spin" />
               {tr.loading}
-            </span>
+            </>
           ) : !hasMore ? (
             tr.noMorePosts
           ) : (
@@ -96,7 +89,7 @@ const Feed = ({ initialPosts = [] }: { initialPosts: Post[] }) => {
           )}
         </button>
       </div>
-    </div>
+    </>
   );
 };
 

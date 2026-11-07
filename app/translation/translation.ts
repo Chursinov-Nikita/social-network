@@ -11,7 +11,6 @@ export const t = {
     profile: "Profile",
 
     // Feed
-    feedSubtitle: "What's happening right now",
     loadMore: "Load more",
     loadingDots: "Loading...",
     noMorePosts: "No more posts",
@@ -78,8 +77,8 @@ export const t = {
 
     // Reels
     newReel: "New reel",
-    clickToSelectVideo: "Click to select video",
-    videoSizeLimit: "MP4, MOV up to 50MB",
+    clickToSelectVideo: "Choose a video",
+    videoSizeLimit: "MP4, MOV or WebM, up to 60 seconds and 100 MB",
     titleOptional: "Title",
     descriptionOptional: "Description (optional)",
     postReel: "Post reel",
@@ -135,8 +134,6 @@ export const t = {
     // Auth
     yourWorld: "Your world,",
     yourRules: "your rules.",
-    authDesc:
-      "Chat, share, and discover new things with millions of people around the world.",
     email: "Email",
     password: "Password",
     forgot: "Forgot?",
@@ -157,7 +154,6 @@ export const t = {
 
     // Notifications
     notificationsTitle: "Notifications",
-    yourActivity: "Your activity",
     markAllAsRead: "Mark all as read",
     noNotificationsYet: "No notifications yet",
     accept: "Accept",
@@ -170,7 +166,6 @@ export const t = {
 
     // Friends
     friendsTitle: "Friends",
-    manageConnections: "Manage your connections",
     friendsTab: "Friends",
     requestsTab: "Requests",
     findPeople: "Find People",
@@ -189,21 +184,17 @@ export const t = {
     removing: "Removing...",
 
     // About
-    estYear: "Est. 2026",
     weBuild: "We Build",
     connections: "Connections",
     aboutDesc:
       "A space to express, discover, and connect — built for the people who make the internet worth exploring.",
     getStarted: "Get Started",
-    learnMore: "Learn More",
-    ourMission: "Our Mission",
     technologyFor: "Technology for",
     humanConnection: "Human Connection",
     missionDesc:
       "To connect people around the world by providing a safe and convenient platform for communication, sharing ideas, and creativity. We believe technology should serve human connections, not divide them.",
     featuresTitle: "Features",
     valuesTitle: "Values",
-    ready: "Ready?",
     joinUs: "Join Us",
     featureChat: "Real-time Chat",
     featureChatDesc:
@@ -245,6 +236,30 @@ export const t = {
     avatarUploadFailed: "Couldn't upload the avatar",
     genericError: "Something went wrong. Please try again.",
 
+    language: "Language",
+    languageName: "English",
+    theme: "Theme",
+    themeDark: "Dark",
+    themeLight: "Light",
+    leaveComment: "Leave a comment",
+    commentsCount: (n: number) => `${n} ${n === 1 ? "comment" : "comments"}`,
+    moreActions: "More actions",
+    pinMessage: "Pin message",
+    closeSearch: "Close search",
+    recordVoice: "Record a voice message",
+    stopRecording: "Stop and send",
+    cancelRecording: "Cancel recording",
+    changeAvatar: "Change avatar",
+    toggleSound: "Toggle sound",
+    removeImage: "Remove image",
+    emoji: "Emoji",
+    videoTooLong: (seconds: number) =>
+      `This video is longer than ${seconds} seconds. Trim it and try again.`,
+    videoUnreadable: "Couldn't read this video. Try an MP4 file.",
+    replaceVideo: "Choose another video",
+    previousResult: "Previous result",
+    nextResult: "Next result",
+
     // Logout
     logOut: "Sign Out",
   },
@@ -261,7 +276,6 @@ export const t = {
     profile: "Профиль",
 
     // Feed
-    feedSubtitle: "Что происходит прямо сейчас",
     loadMore: "Загрузить ещё",
     loadingDots: "Загрузка...",
     noMorePosts: "Постов больше нет",
@@ -327,8 +341,8 @@ export const t = {
 
     // Reels
     newReel: "Новый рилс",
-    clickToSelectVideo: "Нажмите для выбора видео",
-    videoSizeLimit: "MP4, MOV до 50МБ",
+    clickToSelectVideo: "Выбрать видео",
+    videoSizeLimit: "MP4, MOV или WebM, до 60 секунд и 100 МБ",
     titleOptional: "Название",
     descriptionOptional: "Описание (необязательно)",
     postReel: "Опубликовать рилс",
@@ -382,8 +396,6 @@ export const t = {
     // Auth
     yourWorld: "Твой мир,",
     yourRules: "твои правила.",
-    authDesc:
-      "Общайтесь, делитесь и открывайте новое вместе с миллионами людей по всему миру.",
     email: "Электронная почта",
     password: "Пароль",
     forgot: "Забыли?",
@@ -404,7 +416,6 @@ export const t = {
 
     // Notifications
     notificationsTitle: "Уведомления",
-    yourActivity: "Ваша активность",
     markAllAsRead: "Отметить все как прочитанные",
     noNotificationsYet: "Уведомлений пока нет",
     accept: "Принять",
@@ -417,7 +428,6 @@ export const t = {
 
     // Friends
     friendsTitle: "Друзья",
-    manageConnections: "Управление связями",
     friendsTab: "Друзья",
     requestsTab: "Заявки",
     findPeople: "Найти",
@@ -436,21 +446,17 @@ export const t = {
     removing: "Удаление...",
 
     // About
-    estYear: "Осн. 2026",
     weBuild: "Мы создаем",
-    connections: "Мосты между людьми",
+    connections: "мосты между людьми",
     aboutDesc:
       "Пространство для самовыражения, открытий и общения — создано для тех, кто вдохновляет и вдохновляется сам.",
     getStarted: "Начать",
-    learnMore: "Узнать больше",
-    ourMission: "Наша миссия",
     technologyFor: "Технологии для",
     humanConnection: "удобства и вдохновения",
     missionDesc:
       "Соединять людей по всему миру, предоставляя безопасную и удобную платформу для общения, обмена идеями и творчества. Мы верим, что технологии должны служить людям, а не разделять их.",
     featuresTitle: "Возможности",
     valuesTitle: "Ценности",
-    ready: "Готовы?",
     joinUs: "Присоединиться",
     featureChat: "Чат в реальном времени",
     featureChatDesc:
@@ -502,6 +508,37 @@ export const t = {
     postImageAlt: "Изображение поста",
     avatarUploadFailed: "Не удалось загрузить аватар",
     genericError: "Что-то пошло не так. Попробуйте ещё раз.",
+
+    language: "Язык",
+    languageName: "Русский",
+    theme: "Тема",
+    themeDark: "Тёмная",
+    themeLight: "Светлая",
+    leaveComment: "Оставить комментарий",
+    commentsCount: (n: number) => {
+      const mod10 = n % 10;
+      const mod100 = n % 100;
+      if (mod10 === 1 && mod100 !== 11) return `${n} комментарий`;
+      if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14))
+        return `${n} комментария`;
+      return `${n} комментариев`;
+    },
+    moreActions: "Ещё",
+    pinMessage: "Закрепить сообщение",
+    closeSearch: "Закрыть поиск",
+    recordVoice: "Записать голосовое сообщение",
+    stopRecording: "Остановить и отправить",
+    cancelRecording: "Отменить запись",
+    changeAvatar: "Сменить аватар",
+    toggleSound: "Включить или выключить звук",
+    removeImage: "Убрать изображение",
+    emoji: "Эмодзи",
+    videoTooLong: (seconds: number) =>
+      `Видео длиннее ${seconds} секунд. Обрежьте его и попробуйте снова.`,
+    videoUnreadable: "Не удалось прочитать видео. Попробуйте файл MP4.",
+    replaceVideo: "Выбрать другое видео",
+    previousResult: "Предыдущий результат",
+    nextResult: "Следующий результат",
 
     // Logout
     logOut: "Выйти",

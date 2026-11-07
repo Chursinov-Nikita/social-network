@@ -1,5 +1,6 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { removeReelMedia } from "@/lib/reelStorage";
 
 export async function DELETE(
   _: Request,
@@ -16,6 +17,7 @@ export async function DELETE(
     return Response.json({ error: "Forbidden" }, { status: 403 });
 
   await prisma.reel.delete({ where: { id } });
+  await removeReelMedia([reel.videoUrl, reel.thumbnailUrl]);
 
   return new Response(null, { status: 204 });
 }

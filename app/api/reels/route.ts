@@ -1,5 +1,6 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { isReelMediaUrl } from "@/lib/reelStorage";
 import { NextRequest } from "next/server";
 
 const PAGE_SIZE = 5;
@@ -45,13 +46,15 @@ export async function POST(req: NextRequest) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
 
   const { videoUrl, thumbnailUrl, caption } = await req.json();
-  if (typeof videoUrl !== "string" || !videoUrl.startsWith("/uploads/reels/"))
+  if (!isReelMediaUrl(videoUrl, session.user.id))
     return Response.json({ error: "videoUrl is required" }, { status: 400 });
 
   const reel = await prisma.reel.create({
     data: {
       videoUrl,
-      thumbnailUrl,
+      thumbnailUrl: isReelMediaUrl(thumbnailUrl, session.user.id)
+        ? thumbnailUrl
+        : null,
       caption: typeof caption === "string" ? caption.trim() || null : null,
       userId: session.user.id,
     },

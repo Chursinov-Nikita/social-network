@@ -1,16 +1,19 @@
 "use client";
+import Avatar from "@/app/components/ui/Avatar";
+import { ConfirmDialog } from "@/app/components/ui/Dialog";
 import { useLang } from "@/app/context/language";
 import { t } from "@/app/translation/translation";
 import type { Comment, Post } from "@/app/types/feed";
 import {
   ChatBubbleLeftIcon,
+  ChevronRightIcon,
   EllipsisHorizontalIcon,
   HeartIcon,
   TrashIcon,
   XMarkIcon,
 } from "@heroicons/react/24/outline";
 import { HeartIcon as HeartSolidIcon } from "@heroicons/react/24/solid";
-import { Loader2 } from "lucide-react";
+import { Loader2, SendHorizontal } from "lucide-react";
 import Image from "next/image";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { formatDistanceToNow, format } from "date-fns";
@@ -202,45 +205,36 @@ const PostCard = ({
   const username = post.author.name ?? tr.anonymous;
 
   return (
-    <div className="rounded-xl bg-(--bg-secondary) overflow-hidden">
-      <div className="px-4 pt-4 pb-2 flex items-center justify-between">
-        <div className="flex items-center space-x-3">
-          {post.author.image ? (
-            <Image
-              src={post.author.image}
-              width={40}
-              height={40}
-              className="rounded-full object-cover w-10 h-10"
-              alt={username}
-            />
-          ) : (
-            <div className="w-10 h-10 rounded-full bg-(--bg-card) flex items-center justify-center text-sm font-bold text-(--text-primary) shrink-0">
-              {username.charAt(0).toUpperCase()}
-            </div>
-          )}
-          <span className="font-semibold text-sm text-(--text-primary)">
-            {username}
-          </span>
+    <article className="panel">
+      <div className="flex items-center gap-3 px-4 pt-3 pb-2">
+        <Avatar name={username} image={post.author.image} size={40} />
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-base font-medium">{username}</p>
+          <p className="text-xs text-faint">
+            {formatDate(post.createdAt, lang)}
+          </p>
         </div>
 
         {isOwn && (
           <div className="relative" ref={menuRef}>
             <button
               onClick={() => setShowMenu((p) => !p)}
-              className="p-1.5 rounded-lg text-(--text-primary)/30 hover:text-(--text-primary)/70 hover:bg-(--bg-card) transition-colors"
+              aria-label={tr.moreActions}
+              aria-expanded={showMenu}
+              className="icon-btn -mr-2"
             >
-              <EllipsisHorizontalIcon className="w-5 h-5" />
+              <EllipsisHorizontalIcon className="size-5" />
             </button>
             {showMenu && (
-              <div className="absolute right-0 top-8 z-20 min-w-37.5 rounded-xl border border-(--border) bg-(--bg-secondary) shadow-lg overflow-hidden">
+              <div className="menu absolute top-10 right-0">
                 <button
                   onClick={() => {
                     setShowMenu(false);
                     setShowDeleteModal(true);
                   }}
-                  className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-red-400 hover:bg-(--bg-card) transition-colors"
+                  className="menu-item menu-item-danger"
                 >
-                  <TrashIcon className="w-4 h-4" />
+                  <TrashIcon className="size-4" />
                   {tr.deletePost}
                 </button>
               </div>
@@ -249,179 +243,148 @@ const PostCard = ({
         )}
       </div>
 
+      {post.content && (
+        <p className="px-4 pb-3 text-base wrap-break-word whitespace-pre-wrap">
+          {post.content}
+        </p>
+      )}
+
       {post.imageUrl && (
-        <div className="relative w-full aspect-video">
-          <Image
-            src={post.imageUrl}
-            fill
-            sizes="100vw"
-            className="object-cover px-4"
-            alt={tr.postImageAlt}
-          />
+        <Image
+          src={post.imageUrl}
+          width={0}
+          height={0}
+          sizes="(max-width: 672px) 100vw, 640px"
+          className="mb-3 h-auto max-h-[70vh] w-full object-cover"
+          alt={tr.postImageAlt}
+        />
+      )}
+
+      <div className="px-4 pb-3">
+        <button
+          onClick={handleLike}
+          disabled={!currentUserId || isLiking}
+          aria-pressed={liked}
+          aria-label={`${tr.likes}: ${likesCount}`}
+          className={`inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-full px-3 text-sm tabular-nums transition-[background-color,color,scale] duration-150 active:scale-95 disabled:cursor-default disabled:active:scale-100 ${
+            liked
+              ? "bg-primary text-on-primary"
+              : "bg-raised text-muted enabled:hover:bg-active enabled:hover:text-ink"
+          }`}
+        >
+          {liked ? (
+            <HeartSolidIcon className="size-4" />
+          ) : (
+            <HeartIcon className="size-4" />
+          )}
+          {likesCount}
+        </button>
+      </div>
+
+      <button
+        onClick={() => setShowComments((p) => !p)}
+        aria-expanded={showComments}
+        className={`flex h-11 w-full cursor-pointer items-center gap-3 border-t border-line px-4 text-sm text-muted transition-colors duration-150 hover:bg-raised hover:text-ink ${showComments ? "" : "sm:rounded-b-2xl"}`}
+      >
+        <ChatBubbleLeftIcon className="size-5 shrink-0" />
+        <span className="flex-1 text-left">
+          {commentsCount === 0
+            ? tr.leaveComment
+            : tr.commentsCount(commentsCount)}
+        </span>
+        <ChevronRightIcon
+          className={`size-4 shrink-0 transition-transform duration-150 ${showComments ? "rotate-90" : ""}`}
+        />
+      </button>
+
+      {showComments && (
+        <div className="border-t border-line px-4 py-3">
+          <div className="thin-scroll max-h-72 space-y-3 overflow-y-auto">
+            {loadingComments ? (
+              <span className="flex items-center gap-2 text-sm text-muted">
+                <Loader2 className="size-4 animate-spin" />
+                {tr.loadingComments}
+              </span>
+            ) : comments.length === 0 ? (
+              <p className="py-1 text-sm text-muted">{tr.noCommentsYet}</p>
+            ) : (
+              comments.map((comment) => (
+                <div key={comment.id} className="group/comment flex gap-2.5">
+                  <Avatar
+                    name={comment.author.name}
+                    image={comment.author.image}
+                    size={32}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium">
+                      {comment.author.name}
+                    </p>
+                    <p className="text-sm wrap-break-word whitespace-pre-wrap text-muted">
+                      {comment.content}
+                    </p>
+                  </div>
+                  {comment.authorId === currentUserId && (
+                    <button
+                      onClick={() => setCommentToDelete(comment.id)}
+                      aria-label={tr.deleteComment}
+                      className="icon-btn size-8 hover:text-danger"
+                    >
+                      <XMarkIcon className="size-4" />
+                    </button>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+
+          {currentUserId && (
+            <div className="mt-3 flex items-center gap-2">
+              <input
+                type="text"
+                value={commentText}
+                onChange={(e) => setCommentText(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleComment()}
+                placeholder={tr.writeComment}
+                aria-label={tr.writeComment}
+                className="field h-10 rounded-full"
+              />
+              <button
+                onClick={handleComment}
+                disabled={loadingComment || !commentText.trim()}
+                aria-label={tr.send}
+                className="btn btn-primary size-10 shrink-0 px-0"
+              >
+                <SendHorizontal className="size-4" />
+              </button>
+            </div>
+          )}
         </div>
       )}
 
-      <div className="px-4 pb-4 pt-2 space-y-3">
-        {post.content && (
-          <p className="text-sm text-(--text-primary)/80 leading-relaxed">
-            {post.content}
-          </p>
-        )}
-        <div className="h-px bg-(--border)" />
-
-        <div className="flex space-x-4">
-          <button
-            onClick={handleLike}
-            disabled={!currentUserId || isLiking}
-            className={`flex items-center space-x-1.5 text-sm transition-all duration-200 disabled:opacity-30 ${liked ? "text-red-400" : "text-(--text-primary)/30 hover:text-red-400"}`}
-          >
-            {liked ? (
-              <HeartSolidIcon className="w-5 h-5" />
-            ) : (
-              <HeartIcon className="w-5 h-5" />
-            )}
-            <span>{likesCount}</span>
-          </button>
-
-          <button
-            onClick={() => setShowComments((p) => !p)}
-            className={`flex items-center space-x-1.5 text-sm transition-colors duration-200 ${showComments ? "text-(--text-primary)/60" : "text-(--text-primary)/30 hover:text-(--text-primary)/60"}`}
-          >
-            <ChatBubbleLeftIcon className="w-5 h-5" />
-            <span>{commentsCount}</span>
-          </button>
-
-          <span className="ml-auto text-[9px] text-(--text-primary)/30">
-            {formatDate(post.createdAt, lang)}
-          </span>
-        </div>
-
-        {showComments && (
-          <div className="space-y-3 pt-1">
-            <div className="h-px bg-(--border)" />
-            <div className="space-y-3 max-h-48 overflow-y-auto [scrollbar-width:thin] [scrollbar-color:var(--border)_transparent]">
-              {loadingComments ? (
-                <span className="flex items-center gap-2">
-                  <Loader2 className="w-4.5 h-4.5 animate-spin" />
-                  {tr.loadingComments}
-                </span>
-              ) : comments.length === 0 ? (
-                <p className="text-xs text-(--text-primary)/20 text-center py-2">
-                  {tr.noCommentsYet}
-                </p>
-              ) : (
-                comments.map((comment) => (
-                  <div key={comment.id} className="flex items-start gap-2">
-                    <div className="w-7 h-7 rounded-full bg-(--bg-card) flex items-center justify-center text-xs font-bold text-(--text-primary) shrink-0">
-                      {comment.author.name?.charAt(0).toUpperCase()}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <span className="text-xs font-medium text-(--text-primary)/70 mr-1">
-                        {comment.author.name}
-                      </span>
-                      <p className="text-xs text-(--text-primary)/50 leading-relaxed">
-                        {comment.content}
-                      </p>
-                    </div>
-                    {comment.authorId === currentUserId && (
-                      <button
-                        onClick={() => setCommentToDelete(comment.id)}
-                        className="text-(--text-primary)/20 hover:text-red-400 transition-colors shrink-0"
-                      >
-                        <XMarkIcon className="w-4 h-4 mr-3" />
-                      </button>
-                    )}
-                  </div>
-                ))
-              )}
-            </div>
-
-            {currentUserId && (
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={commentText}
-                  onChange={(e) => setCommentText(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleComment()}
-                  placeholder={tr.writeComment}
-                  className="flex-1 bg-(--bg-primary) border border-(--border) focus:border-(--text-primary)/20 rounded-xl px-3 py-2 text-xs text-(--text-primary) placeholder:text-(--text-primary)/20 outline-none transition-colors"
-                />
-                <button
-                  onClick={handleComment}
-                  disabled={loadingComment || !commentText.trim()}
-                  className="px-3 py-2 rounded-xl bg-(--bg-card) hover:opacity-80 text-xs text-(--text-primary) disabled:opacity-30 transition-colors"
-                >
-                  {tr.send}
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-
       {commentToDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
-          <div className="w-full max-w-md rounded-2xl border border-(--border) bg-(--bg-secondary) p-5 shadow-2xl">
-            <h2 className="text-base font-semibold text-(--text-primary)">
-              {tr.deleteComment}
-            </h2>
-            <p className="mt-2 text-sm text-(--text-primary)/60">
-              {tr.deleteCommentDesc}
-            </p>
-            <div className="mt-5 flex justify-end gap-2">
-              <button
-                onClick={() => setCommentToDelete(null)}
-                className="px-3 py-1.5 rounded-lg text-sm text-(--text-primary)/60 hover:bg-(--bg-card) transition-colors"
-              >
-                {tr.cancel}
-              </button>
-              <button
-                onClick={confirmDeleteComment}
-                className="px-3 py-1.5 rounded-lg text-sm font-medium text-white bg-red-500/80 hover:bg-red-500 transition-colors"
-              >
-                {tr.delete}
-              </button>
-            </div>
-          </div>
-        </div>
+        <ConfirmDialog
+          title={tr.deleteComment}
+          description={tr.deleteCommentDesc}
+          confirmLabel={tr.delete}
+          cancelLabel={tr.cancel}
+          onConfirm={confirmDeleteComment}
+          onCancel={() => setCommentToDelete(null)}
+        />
       )}
 
       {showDeleteModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
-          <div className="w-full max-w-md rounded-2xl border border-(--border) bg-(--bg-secondary) p-5 shadow-2xl">
-            <h2 className="text-base font-semibold text-(--text-primary)">
-              {tr.deletePost}
-            </h2>
-            <p className="mt-2 text-sm text-(--text-primary)/60">
-              {tr.deletePostDesc}
-            </p>
-            <div className="mt-5 flex justify-end gap-2">
-              <button
-                onClick={() => setShowDeleteModal(false)}
-                disabled={deletingPost}
-                className="px-3 py-1.5 rounded-lg text-sm text-(--text-primary)/60 hover:bg-(--bg-card) transition-colors disabled:opacity-30"
-              >
-                {tr.cancel}
-              </button>
-              <button
-                onClick={handleDeletePost}
-                disabled={deletingPost}
-                className="px-3 py-1.5 rounded-lg text-sm font-medium text-white bg-red-500/80 hover:bg-red-500 transition-colors disabled:opacity-50 flex items-center gap-2"
-              >
-                {deletingPost ? (
-                  <span className="flex items-center gap-2">
-                    <Loader2 className="w-4.5 h-4.5 animate-spin" />
-                    {tr.deleting}
-                  </span>
-                ) : (
-                  tr.delete
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
+        <ConfirmDialog
+          title={tr.deletePost}
+          description={tr.deletePostDesc}
+          confirmLabel={tr.delete}
+          cancelLabel={tr.cancel}
+          pendingLabel={tr.deleting}
+          pending={deletingPost}
+          onConfirm={handleDeletePost}
+          onCancel={() => setShowDeleteModal(false)}
+        />
       )}
-    </div>
+    </article>
   );
 };
 

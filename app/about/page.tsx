@@ -1,10 +1,14 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
+import NeblMark from "@/app/components/shell/NeblMark";
 import { getFeatures, getValues } from "./values";
 import { useLang } from "@/app/context/language";
 import { t } from "@/app/translation/translation";
+import chatScreenshot from "@/public/about/chat.jpg";
+import feedScreenshot from "@/public/about/feed-phone.jpg";
 
 const About = () => {
   const { data: session } = useSession();
@@ -12,121 +16,81 @@ const About = () => {
   const tr = t[lang];
   const features = getFeatures(tr);
   const values = getValues(tr);
-  const isLoggedIn = !!session?.user;
+  const startHref = session?.user ? "/" : "/login";
 
   return (
-    <div className="relative min-h-screen bg-(--bg-primary) text-(--text-primary) overflow-hidden">
-      <div className="relative z-10 max-w-5xl mx-auto px-6">
-        <section className="min-h-screen flex flex-col items-center justify-center text-center gap-8 pb-10">
-          <p className="text-xs tracking-[0.3em] text-(--text-primary)/40 uppercase">
-            {tr.estYear}
-          </p>
-          <h1 className="text-7xl font-black leading-none tracking-tighter">
-            <span className="block text-(--text-primary)">{tr.weBuild}</span>
-            <span className="block text-(--text-primary)">
-              {tr.connections}
-            </span>
-          </h1>
-          <p className="text-(--text-primary)/60 text-lg max-w-lg leading-relaxed">
-            {tr.aboutDesc}
-          </p>
-          <div className="flex items-center gap-4 mt-4">
-            <Link
-              href={isLoggedIn ? "/" : "/login"}
-              className="px-8 py-3 rounded-full font-semibold text-sm bg-(--bg-card) text-(--text-primary) hover:opacity-80 transition-all duration-200 hover:scale-105"
-            >
-              {tr.getStarted}
-            </Link>
-            <Link
-              href="#mission"
-              className="px-8 py-3 rounded-full font-semibold text-sm border border-(--border) text-(--text-primary)/60 hover:text-(--text-primary) transition-all duration-200"
-            >
-              {tr.learnMore}
-            </Link>
-          </div>
-        </section>
+    <div className="mx-auto max-w-4xl px-4 py-8 md:px-6 md:py-12">
+      <section className="text-center">
+        <NeblMark className="mx-auto mb-5 h-7 w-9" />
+        <h1 className="text-2xl font-medium md:text-3xl">
+          {tr.weBuild} {tr.connections}
+        </h1>
+        <p className="mx-auto mt-3 max-w-2xl text-base text-muted">
+          {tr.aboutDesc}
+        </p>
+        <Link href={startHref} className="btn btn-primary mt-5">
+          {tr.getStarted}
+        </Link>
+        <Image
+          src={chatScreenshot}
+          alt={tr.chats}
+          priority
+          sizes="(max-width: 896px) 100vw, 848px"
+          className="mt-8 w-full rounded-2xl"
+        />
+      </section>
 
-        <section id="mission" className="py-24 border-t border-(--border)">
-          <div className="grid md:grid-cols-2 gap-16 items-center">
-            <div>
-              <p className="text-xs tracking-[0.3em] text-(--text-primary)/60 uppercase mb-6">
-                {tr.ourMission}
-              </p>
-              <h2 className="text-5xl font-black leading-tight mb-6">
-                {tr.technologyFor}
-                <span className="block text-(--text-primary)/30">
-                  {tr.humanConnection}
-                </span>
-              </h2>
-            </div>
-            <p className="text-(--text-primary)/60 text-lg leading-relaxed">
-              {tr.missionDesc}
-            </p>
-          </div>
-        </section>
+      <section className="mt-12 md:mt-16">
+        <h2 className="text-xl font-medium">
+          {tr.technologyFor} {tr.humanConnection}
+        </h2>
+        <p className="mt-2 max-w-2xl text-base text-muted">{tr.missionDesc}</p>
+      </section>
 
-        <section className="py-24 border-t border-(--border)">
-          <p className="text-xs tracking-[0.3em] text-(--text-primary)/60 uppercase mb-16">
-            {tr.featuresTitle}
-          </p>
-          <div className="grid md:grid-cols-3 gap-px bg-(--border) rounded-3xl overflow-hidden">
-            {features.map((feature, idx) => (
-              <div
-                key={idx}
-                className="group bg-(--bg-primary) hover:bg-(--bg-secondary) p-10 transition-all duration-300"
-              >
-                <div className="text-3xl mb-8">{feature.icon}</div>
-                <h3 className="text-lg font-bold mb-3 text-(--text-primary)">
-                  {feature.title}
-                </h3>
-                <p className="text-(--text-primary)/50 text-sm leading-relaxed">
-                  {feature.description}
-                </p>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        <section className="py-24 border-t border-(--border)">
-          <p className="text-xs tracking-[0.3em] text-(--text-primary)/60 uppercase mb-16">
-            {tr.valuesTitle}
-          </p>
-          <div className="grid md:grid-cols-2 gap-6">
-            {values.map((value, idx) => (
-              <div
-                key={idx}
-                className="group flex items-start gap-6 p-8 rounded-2xl border border-(--border) hover:bg-(--bg-secondary) transition-all duration-300"
-              >
-                <div className="text-2xl shrink-0 mt-1">{value.icon}</div>
+      <section className="mt-12 grid items-center gap-8 md:mt-16 md:grid-cols-[1fr_280px]">
+        <div>
+          <h2 className="text-xl font-medium">{tr.featuresTitle}</h2>
+          <ul className="mt-4 space-y-5">
+            {features.map(({ icon: Icon, title, description }) => (
+              <li key={title} className="flex gap-4">
+                <Icon
+                  className="mt-0.5 size-5 shrink-0 text-muted"
+                  strokeWidth={1.75}
+                />
                 <div>
-                  <h3 className="font-bold text-base mb-2 text-(--text-primary)">
-                    {value.title}
-                  </h3>
-                  <p className="text-(--text-primary)/50 text-sm leading-relaxed">
-                    {value.description}
-                  </p>
+                  <h3 className="text-base font-medium">{title}</h3>
+                  <p className="mt-0.5 text-base text-muted">{description}</p>
                 </div>
-              </div>
+              </li>
             ))}
-          </div>
-        </section>
+          </ul>
+        </div>
+        <Image
+          src={feedScreenshot}
+          alt={tr.feed}
+          sizes="280px"
+          className="mx-auto w-full max-w-70 rounded-2xl"
+        />
+      </section>
 
-        <section className="py-8 border-t border-(--border) text-center">
-          <p className="text-xs tracking-[0.3em] text-(--text-primary)/40 uppercase mb-5">
-            {tr.ready}
-          </p>
-          <h2 className="text-6xl font-black leading-none tracking-tighter mb-7.5 text-(--text-primary)">
-            {tr.joinUs}
-          </h2>
-          <Link
-            href={isLoggedIn ? "/" : "/login"}
-            className="inline-flex items-center gap-3 px-12 py-3 rounded-full font-bold text-(--text-primary) bg-(--bg-card) hover:opacity-80 transition-all duration-200 hover:scale-105"
-          >
-            {tr.getStarted}
-            <span className="text-lg">&#8594;</span>
-          </Link>
-        </section>
-      </div>
+      <section className="mt-12 md:mt-16">
+        <h2 className="text-xl font-medium">{tr.valuesTitle}</h2>
+        <dl className="mt-4 grid gap-x-8 gap-y-5 sm:grid-cols-2">
+          {values.map(({ title, description }) => (
+            <div key={title}>
+              <dt className="text-base font-medium">{title}</dt>
+              <dd className="mt-0.5 text-base text-muted">{description}</dd>
+            </div>
+          ))}
+        </dl>
+      </section>
+
+      <section className="mt-12 flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-panel p-5 md:mt-16">
+        <h2 className="text-xl font-medium">{tr.joinUs}</h2>
+        <Link href={startHref} className="btn btn-primary">
+          {tr.getStarted}
+        </Link>
+      </section>
     </div>
   );
 };

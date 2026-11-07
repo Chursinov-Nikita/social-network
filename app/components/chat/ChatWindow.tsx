@@ -1,5 +1,7 @@
 "use client";
 
+import Avatar from "@/app/components/ui/Avatar";
+import { ConfirmDialog } from "@/app/components/ui/Dialog";
 import { useLang } from "@/app/context/language";
 import { useOnlineStatus } from "@/app/hooks/useOnlineStatus";
 import { t } from "@/app/translation/translation";
@@ -11,22 +13,22 @@ import {
 } from "@/app/types/chat";
 import {
   ChevronDown,
+  ChevronLeft,
   ChevronUp,
   EllipsisVertical,
-  Loader2,
-  LucideSendHorizonal,
   PinIcon,
   Search,
-  Smile,
+  SendHorizontal,
   Trash2,
   UserCircle,
+  X,
   XCircle,
 } from "lucide-react";
 import { useSession } from "next-auth/react";
-import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { EMOJI_CATEGORIES } from "./emoji";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import Bubble, { DayChip, getRunInfo } from "./Bubble";
+import EmojiPicker from "./EmojiPicker";
 import { mergeLatestPage } from "./mergeLatestPage";
 
 const POLL_INTERVAL_MS = 5000;
@@ -49,9 +51,11 @@ const useClickOutside = (
 const ChatWindow = ({
   recipient,
   onChatDeleted,
+  onBack,
 }: {
   recipient: ChatUser;
   onChatDeleted?: () => void;
+  onBack?: () => void;
 }) => {
   const { data: session } = useSession();
   const { lang } = useLang();
@@ -67,7 +71,6 @@ const ChatWindow = ({
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [showInputMenu, setShowInputMenu] = useState(false);
-  const [showEmoji, setShowEmoji] = useState(false);
   const [deleteMode, setDeleteMode] = useState<DeleteMode>(null);
   const [deleting, setDeleting] = useState(false);
   const [hoveredMsg, setHoveredMsg] = useState<string | null>(null);
@@ -75,7 +78,6 @@ const ChatWindow = ({
     null,
   );
   const [deletingMsg, setDeletingMsg] = useState(false);
-  const [activeCat, setActiveCat] = useState(0);
   const [highlightedMsgId, setHighlightedMsgId] = useState<string | null>(null);
   const [pinnedIndex, setPinnedIndex] = useState(0);
 
@@ -83,7 +85,6 @@ const ChatWindow = ({
   const menuRef = useRef<HTMLDivElement>(null);
   const inputMenuRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
-  const emojiRef = useRef<HTMLDivElement>(null);
   const lastMessageIdRef = useRef<string | null>(null);
 
   const { onlineUsers, lastSeen } = useOnlineStatus([recipient.id]);
@@ -97,7 +98,6 @@ const ChatWindow = ({
 
   useClickOutside(menuRef, () => setShowMenu(false), showMenu);
   useClickOutside(inputMenuRef, closeSearch, showInputMenu);
-  useClickOutside(emojiRef, () => setShowEmoji(false), showEmoji);
 
   useEffect(() => {
     if (!currentUserId) return;
@@ -164,9 +164,7 @@ const ChatWindow = ({
     return (
       <>
         {text.slice(0, idx)}
-        <mark className="bg-gray-500/40 text-inherit rounded-sm">
-          {text.slice(idx, idx + query.length)}
-        </mark>
+        <mark>{text.slice(idx, idx + query.length)}</mark>
         {text.slice(idx + query.length)}
       </>
     );
@@ -325,116 +323,68 @@ const ChatWindow = ({
   };
 
   return (
-    <div className="flex flex-col h-full overflow-hidden bg-(--bg-primary)">
-      <div className="flex items-center gap-4 px-5 py-3 border-b border-(--border) bg-(--bg-primary)">
-        <div className="relative shrink-0">
-          <div
-            className="w-9 h-9 rounded-full bg-(--bg-card) flex items-center justify-center text-sm font-bold text-(--text-primary) cursor-pointer overflow-hidden"
-            onClick={() => router.push(`/profile/${recipient.id}`)}
+    <div className="flex h-full flex-col overflow-hidden">
+      <header className="relative z-20 flex h-14 shrink-0 items-center gap-1 border-b border-line bg-panel px-2 md:px-4">
+        {onBack && (
+          <button
+            onClick={onBack}
+            aria-label={tr.back}
+            className="icon-btn md:hidden"
           >
-            {recipient.image ? (
-              <Image
-                src={recipient.image}
-                width={36}
-                height={36}
-                className="rounded-full object-cover w-9 h-9"
-                alt={recipient.name ?? ""}
-              />
-            ) : (
-              (recipient.name ?? "?")[0].toUpperCase()
-            )}
-          </div>
-          {isOnline && (
-            <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-(--bg-secondary) rounded-full" />
-          )}
-        </div>
+            <ChevronLeft className="size-6" strokeWidth={1.75} />
+          </button>
+        )}
 
-        <div className="flex-1 min-w-0">
-          <p
-            className="text-sm font-semibold text-(--text-primary) cursor-pointer truncate"
-            onClick={() => router.push(`/profile/${recipient.id}`)}
-          >
-            {recipient.name}
-          </p>
-          <p
-            className={`text-xs transition-colors ${isOnline ? "text-green-500" : "text-(--text-primary)/30"}`}
-          >
-            {statusText}
-          </p>
-        </div>
-
-        <div className="relative flex items-center gap-2" ref={menuRef}>
-          <div ref={inputMenuRef} className="relative flex items-center">
-            <button
-              onClick={() => setShowInputMenu(true)}
-              className={`w-9 h-9 rounded-full flex items-center justify-center text-(--text-primary)/40 hover:text-(--text-primary) hover:bg-(--bg-card) transition-all duration-300
-                ${showInputMenu ? "opacity-0 scale-75 pointer-events-none" : "opacity-100 scale-100 pointer-events-auto"}`}
+        <button
+          onClick={() => router.push(`/profile/${recipient.id}`)}
+          className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 text-left"
+        >
+          <Avatar
+            name={recipient.name}
+            image={recipient.image}
+            size={40}
+            online={isOnline}
+          />
+          <span className="min-w-0">
+            <span className="block truncate text-base font-medium">
+              {recipient.name}
+            </span>
+            <span
+              className={`block truncate text-xs ${isOnline ? "text-ink" : "text-muted"}`}
             >
-              <Search className="w-5 h-5" strokeWidth={1.5} />
-            </button>
+              {statusText}
+            </span>
+          </span>
+        </button>
 
-            <div
-              className={`absolute right-0 flex items-center gap-1 transition-all duration-300
-              ${showInputMenu ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"}`}
-            >
-              <input
-                ref={searchInputRef}
-                type="text"
-                value={searchQuery}
-                onChange={(e) => {
-                  setSearchQuery(e.target.value);
-                  setCurrentSearchIndex(0);
-                }}
-                placeholder={tr.search}
-                className={`bg-(--bg-secondary) rounded-full py-1.5 px-4 text-sm text-(--text-primary) placeholder:text-(--text-secondary) outline-none border-2 border-transparent focus:border-(--text-secondary)/10 transition-all duration-300
-                  ${showInputMenu ? "w-80" : "w-0"}`}
-              />
+        <button
+          onClick={() => setShowInputMenu(true)}
+          aria-label={tr.search}
+          className="icon-btn"
+        >
+          <Search className="size-5" strokeWidth={1.75} />
+        </button>
 
-              {searchResults.length > 0 && (
-                <div className="flex items-center gap-2 shrink-0 pl-3">
-                  <span className="text-xs text-(--text-primary)/40 tabular-nums whitespace-nowrap">
-                    {currentSearchIndex + 1}/{searchResults.length}
-                  </span>
-                  <button
-                    onClick={goToPrevResult}
-                    className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-(--bg-card) text-(--text-primary)/50 hover:text-(--text-primary) transition-colors"
-                  >
-                    <ChevronUp className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={goToNextResult}
-                    className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-(--bg-card) text-(--text-primary)/50 hover:text-(--text-primary) transition-colors"
-                  >
-                    <ChevronDown className="w-4 h-4" />
-                  </button>
-                </div>
-              )}
-
-              {searchQuery.trim() && searchResults.length === 0 && (
-                <span className="text-xs text-(--text-primary)/30 whitespace-nowrap px-3">
-                  {tr.nothingFound}
-                </span>
-              )}
-            </div>
-          </div>
-
+        <div className="relative" ref={menuRef}>
           <button
             onClick={() => setShowMenu((p) => !p)}
-            className="w-9 h-9 rounded-full flex items-center justify-center text-(--text-primary)/40 hover:text-(--text-primary) hover:bg-(--bg-card) transition-colors"
+            aria-label={tr.moreActions}
+            aria-expanded={showMenu}
+            className="icon-btn"
           >
-            <EllipsisVertical className="w-5 h-5" />
+            <EllipsisVertical className="size-5" strokeWidth={1.75} />
           </button>
 
           {showMenu && (
-            <div className="absolute right-0 top-15 z-30 bg-(--bg-primary) border border-(--border) rounded-xl p-1 shadow-sm min-w-48">
+            <div className="menu absolute top-11 right-0">
               <button
-                className="w-full flex items-center gap-2 px-3 py-2 text-xs text-(--text-primary)/70 hover:bg-(--bg-card) rounded-lg transition-colors text-left"
+                className="menu-item"
                 onClick={() => {
                   router.push(`/profile/${recipient.id}`);
                   setShowMenu(false);
                 }}
               >
-                <UserCircle className="w-4 h-4" />
+                <UserCircle className="size-4" />
                 {tr.goToProfile}
               </button>
               <button
@@ -442,9 +392,9 @@ const ChatWindow = ({
                   setDeleteMode("mine");
                   setShowMenu(false);
                 }}
-                className="w-full flex items-center gap-2 px-3 py-2 text-xs text-(--text-primary)/70 hover:bg-(--bg-card) rounded-lg transition-colors text-left"
+                className="menu-item"
               >
-                <Trash2 className="w-3.5 h-3.5" />
+                <Trash2 className="size-4" />
                 {deleteModalTitles.mine}
               </button>
               <button
@@ -452,286 +402,250 @@ const ChatWindow = ({
                   setDeleteMode("all");
                   setShowMenu(false);
                 }}
-                className="w-full flex items-center gap-2 px-3 py-2 text-xs text-red-400 hover:bg-red-500/10 rounded-lg transition-colors text-left"
+                className="menu-item menu-item-danger"
               >
-                <Trash2 className="w-3.5 h-3.5" />
+                <Trash2 className="size-4" />
                 {deleteModalTitles.all}
               </button>
-              <div className="h-px bg-(--border) my-1" />
               <button
                 onClick={() => {
                   setDeleteMode("chat");
                   setShowMenu(false);
                 }}
-                className="w-full flex items-center gap-2 px-3 py-2 text-xs text-red-500 hover:bg-red-500/10 rounded-lg transition-colors text-left font-medium"
+                className="menu-item menu-item-danger"
               >
-                <XCircle className="w-4 h-4" />
+                <XCircle className="size-4" />
                 {deleteModalTitles.chat}
               </button>
             </div>
           )}
         </div>
-      </div>
+
+        {showInputMenu && (
+          <div
+            ref={inputMenuRef}
+            className="absolute inset-0 z-10 flex items-center gap-1 bg-panel px-2 md:px-4"
+          >
+            <button
+              onClick={closeSearch}
+              aria-label={tr.closeSearch}
+              className="icon-btn"
+            >
+              <X className="size-5" strokeWidth={1.75} />
+            </button>
+            <input
+              ref={searchInputRef}
+              type="text"
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setCurrentSearchIndex(0);
+              }}
+              placeholder={tr.search}
+              aria-label={tr.search}
+              className="field h-10 min-w-0 flex-1 rounded-full"
+            />
+            {searchResults.length > 0 && (
+              <>
+                <span className="px-1 text-sm whitespace-nowrap text-muted tabular-nums">
+                  {currentSearchIndex + 1}/{searchResults.length}
+                </span>
+                <button
+                  onClick={goToPrevResult}
+                  aria-label={tr.previousResult}
+                  className="icon-btn"
+                >
+                  <ChevronUp className="size-5" strokeWidth={1.75} />
+                </button>
+                <button
+                  onClick={goToNextResult}
+                  aria-label={tr.nextResult}
+                  className="icon-btn"
+                >
+                  <ChevronDown className="size-5" strokeWidth={1.75} />
+                </button>
+              </>
+            )}
+            {searchQuery.trim() && searchResults.length === 0 && (
+              <span className="px-2 text-sm whitespace-nowrap text-muted">
+                {tr.nothingFound}
+              </span>
+            )}
+          </div>
+        )}
+      </header>
 
       {pinned.length > 0 && (
-        <div
-          className="flex items-center gap-3 px-6 py-2.5 bg-(--bg-secondary) cursor-pointer hover:bg-(--bg-card) transition-colors rounded-full box-border m-3"
+        <button
           onClick={handlePinnedPanelClick}
+          className="flex h-12 w-full shrink-0 cursor-pointer items-center gap-3 border-b border-line bg-panel px-4 text-left transition-colors hover:bg-raised"
         >
-          <PinIcon className="w-4 h-4 text-blue-500 shrink-0" />
-          <div className="flex-1 min-w-0">
-            <p className="text-[11px] text-(--text-primary) font-medium">
-              {tr.pinned}
-            </p>
-            <p className="text-xs text-(--text-primary)/40 truncate">
+          <span aria-hidden="true" className="h-8 w-0.5 rounded-full bg-ink" />
+          <span className="min-w-0 flex-1">
+            <span className="block text-xs font-medium">{tr.pinned}</span>
+            <span className="block truncate text-sm text-muted">
               {pinned[pinnedIndex % pinned.length].content}
-            </p>
-          </div>
+            </span>
+          </span>
           {pinned.length > 1 && (
-            <span className="text-[10px] text-(--text-primary)/30 shrink-0">
+            <span className="text-xs text-muted tabular-nums">
               {(pinnedIndex % pinned.length) + 1}/{pinned.length}
             </span>
           )}
-        </div>
+          <PinIcon className="size-4 shrink-0 text-muted" />
+        </button>
       )}
 
       <div
         ref={containerRef}
-        className="flex-1 min-h-0 overflow-y-auto px-16 py-4 space-y-1 [scrollbar-width:thin] [scrollbar-color:var(--border)_transparent]"
+        className="thin-scroll min-h-0 flex-1 overflow-y-auto"
       >
-        {hasMore && (
-          <div className="flex justify-center pb-3">
+        <div className="mx-auto flex w-full max-w-3xl flex-col px-3 py-3 md:px-6">
+          {hasMore && (
             <button
               onClick={loadOlder}
               disabled={loadingOlder}
-              className="text-xs px-3 py-1.5 rounded-full bg-(--bg-secondary) text-(--text-primary)/80 hover:bg-(--bg-card) disabled:opacity-40 transition-colors"
+              className="btn btn-secondary mb-2 h-8 self-center text-xs"
             >
               {loadingOlder ? tr.loading : tr.loadOlderMessages}
             </button>
-          </div>
-        )}
+          )}
 
-        {messages.map((msg) => {
-          const isMe = msg.senderId === currentUserId;
-          const isCurrent = searchResults[currentSearchIndex] === msg.id;
-          const isMatch = searchResults.includes(msg.id);
-          const isHighlighted = highlightedMsgId === msg.id;
+          {messages.map((msg, index) => {
+            const isMe = msg.senderId === currentUserId;
+            const isCurrent = searchResults[currentSearchIndex] === msg.id;
+            const isMatch = searchResults.includes(msg.id);
+            const isHighlighted = highlightedMsgId === msg.id;
+            const { startsDay, startsRun, endsRun } = getRunInfo(
+              messages,
+              index,
+            );
 
-          return (
-            <div
-              key={msg.id}
-              id={`msg-${msg.id}`}
-              className={`flex ${isMe ? "justify-end" : "justify-start"} group/msg`}
-              onMouseEnter={() => setHoveredMsg(msg.id)}
-              onMouseLeave={() => setHoveredMsg(null)}
-            >
-              <div className="flex items-end gap-1">
-                {hoveredMsg === msg.id && (
-                  <div
-                    className={`flex flex-row gap-1.5 ${isMe ? "" : "order-last"}`}
-                  >
-                    {isMe && (
-                      <button
-                        onClick={() => setPendingDeleteMsgId(msg.id)}
-                        className="w-5 h-5 p-1 rounded-full bg-(--bg-secondary) flex items-center justify-center text-(--text-primary)/50 hover:text-red-400 hover:bg-(--bg-card)/70 transition-colors mb-2 shrink-0"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    )}
-                    <button
-                      onClick={async () => {
-                        await fetch(`/api/chat/messages/${msg.id}/pin`, {
-                          method: "PATCH",
-                        });
-                        setMessages((prev) =>
-                          prev.map((m) =>
-                            m.id === msg.id ? { ...m, pinned: !m.pinned } : m,
-                          ),
-                        );
-                      }}
-                      className="w-5 h-5 p-1 rounded-full bg-(--bg-secondary) flex items-center justify-center hover:bg-(--bg-card)/70 transition-colors mb-2 shrink-0"
-                    >
-                      <PinIcon
-                        className={`w-3.5 h-3.5 transition-colors ${msg.pinned ? "text-blue-500" : "text-(--text-primary)/50 hover:text-(--text-primary)"}`}
-                      />
-                    </button>
-                  </div>
-                )}
+            return (
+              <Fragment key={msg.id}>
+                {startsDay && <DayChip date={msg.createdAt} lang={lang} />}
                 <div
-                  className={`flex justify-between py-1.5 px-6 rounded-full text-sm leading-relaxed text-(--text-primary) transition-all duration-300 max-w-xs
-                    ${isMe ? "bg-(--bg-card) rounded-br-none" : "bg-(--bg-secondary) rounded-bl-none"}
-                    ${isCurrent ? "ring-2 ring-gray-500/60" : ""}
-                    ${isHighlighted ? "ring-2 ring-blue-500/60 scale-[1.02] brightness-110" : ""}
-                  `}
+                  id={`msg-${msg.id}`}
+                  className={`flex ${isMe ? "justify-end" : "justify-start"} ${startsRun ? "mt-2" : "mt-0.5"}`}
+                  onMouseEnter={() => setHoveredMsg(msg.id)}
+                  onMouseLeave={() => setHoveredMsg(null)}
                 >
-                  <p>
-                    {isMatch
-                      ? highlightText(msg.content, searchQuery)
-                      : msg.content}
-                  </p>
-                  <div className="flex items-end ml-3">
-                    <p className="text-[9px] text-(--text-primary)/40">
-                      {new Date(msg.createdAt).toLocaleTimeString(lang, {
+                  <div className="flex max-w-[85%] items-end gap-1 md:max-w-[75%]">
+                    {hoveredMsg === msg.id && (
+                      <div
+                        className={`flex shrink-0 gap-1 ${isMe ? "" : "order-last"}`}
+                      >
+                        {isMe && (
+                          <button
+                            onClick={() => setPendingDeleteMsgId(msg.id)}
+                            aria-label={tr.deleteThisMessage}
+                            className="icon-btn size-7 bg-panel hover:text-danger"
+                          >
+                            <Trash2 className="size-3.5" />
+                          </button>
+                        )}
+                        <button
+                          onClick={async () => {
+                            await fetch(`/api/chat/messages/${msg.id}/pin`, {
+                              method: "PATCH",
+                            });
+                            setMessages((prev) =>
+                              prev.map((m) =>
+                                m.id === msg.id
+                                  ? { ...m, pinned: !m.pinned }
+                                  : m,
+                              ),
+                            );
+                          }}
+                          aria-label={tr.pinMessage}
+                          aria-pressed={msg.pinned}
+                          className={`icon-btn size-7 bg-panel ${msg.pinned ? "text-ink" : ""}`}
+                        >
+                          <PinIcon
+                            className={`size-3.5 ${msg.pinned ? "fill-current" : ""}`}
+                          />
+                        </button>
+                      </div>
+                    )}
+                    <Bubble
+                      isMe={isMe}
+                      tail={endsRun}
+                      time={new Date(msg.createdAt).toLocaleTimeString(lang, {
                         hour: "2-digit",
                         minute: "2-digit",
                       })}
-                    </p>
+                      text={
+                        isMatch
+                          ? highlightText(msg.content, searchQuery)
+                          : msg.content
+                      }
+                      className={`${isCurrent ? "ring-2 ring-line-strong" : ""} ${isHighlighted ? "ring-2 ring-ink" : ""}`}
+                    />
                   </div>
                 </div>
-              </div>
-            </div>
-          );
-        })}
+              </Fragment>
+            );
+          })}
+        </div>
       </div>
 
-      <div className="py-5 px-15">
-        <div className="flex items-end gap-1">
-          <div ref={emojiRef} className="relative">
-            <button
-              onClick={() => setShowEmoji((p) => !p)}
-              className="bg-(--bg-secondary) rounded-full p-3.5 transition-colors hover:bg-(--bg-card)"
-            >
-              <Smile className="w-5 h-5 text-(--text-primary)/85" />
-            </button>
-            {showEmoji && (
-              <div className="absolute bottom-14 left-0 z-30 bg-(--bg-secondary) border border-(--border) rounded-2xl shadow-2xl w-72 overflow-hidden">
-                <div className="flex border-b border-(--border)">
-                  {EMOJI_CATEGORIES.map((cat, i) => (
-                    <button
-                      key={cat.label.en}
-                      onClick={() => setActiveCat(i)}
-                      className={`flex-1 py-2 text-[11px] font-medium transition-colors ${activeCat === i ? "text-(--text-primary) border-b-2 border-(--text-primary) -mb-px" : "text-(--text-primary)/40 hover:text-(--text-primary)/70"}`}
-                    >
-                      {cat.emojis[0]}
-                    </button>
-                  ))}
-                </div>
-                <p className="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-(--text-primary)/30">
-                  {EMOJI_CATEGORIES[activeCat].label[lang]}
-                </p>
-                <div className="grid grid-cols-8 gap-px px-2 pb-2">
-                  {EMOJI_CATEGORIES[activeCat].emojis.map((emoji) => (
-                    <button
-                      key={emoji}
-                      onClick={() => {
-                        setContent((prev) => prev + emoji);
-                        setShowEmoji(false);
-                      }}
-                      className="aspect-square flex items-center justify-center text-2xl hover:bg-(--bg-card) rounded-xl transition-colors"
-                    >
-                      {emoji}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
+      <div className="shrink-0 px-3 pt-1 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:px-6 md:pb-4">
+        <div className="mx-auto flex max-w-3xl items-end gap-2">
+          <div className="flex min-w-0 flex-1 items-end rounded-2xl bg-panel">
+            <EmojiPicker
+              onPick={(emoji) => setContent((prev) => prev + emoji)}
+            />
+            <textarea
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  void sendMessage();
+                }
+              }}
+              placeholder={tr.writeMessage}
+              aria-label={tr.writeMessage}
+              rows={1}
+              className="thin-scroll field-sizing-content max-h-40 min-h-11 min-w-0 flex-1 resize-none bg-transparent py-[11px] pr-3 text-base outline-none placeholder:text-faint"
+            />
           </div>
-
-          <textarea
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                void sendMessage();
-              }
-            }}
-            placeholder={tr.writeMessage}
-            rows={1}
-            className="flex-1 bg-(--bg-secondary) rounded-full py-3.5 px-5 text-sm text-(--text-primary) placeholder:text-(--text-primary)/85 resize-none focus:outline-none transition-colors overflow-hidden"
-          />
 
           <button
             onClick={() => void sendMessage()}
-            className="w-12 h-12 bg-(--bg-secondary) rounded-full flex items-center justify-center transition-colors hover:bg-(--bg-card)"
+            disabled={!content.trim()}
+            aria-label={tr.send}
+            className="btn btn-primary size-11 shrink-0 px-0"
           >
-            <LucideSendHorizonal className="w-5 h-5 text-(--text-primary)/85 pl-0.5" />
+            <SendHorizontal className="size-5" />
           </button>
         </div>
       </div>
 
       {pendingDeleteMsgId && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4"
-          onClick={() => !deletingMsg && setPendingDeleteMsgId(null)}
-        >
-          <div
-            className="w-full max-w-md rounded-2xl border border-(--border) bg-(--bg-secondary) p-5 shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 className="text-base font-semibold text-(--text-primary)">
-              {tr.deleteThisMessage}
-            </h2>
-            <p className="mt-2 text-sm text-(--text-primary)/60">
-              {tr.deleteThisMessageDesc}
-            </p>
-            <div className="mt-5 flex justify-end gap-2">
-              <button
-                onClick={() => setPendingDeleteMsgId(null)}
-                disabled={deletingMsg}
-                className="px-3 py-1.5 rounded-lg text-sm text-(--text-primary)/60 hover:bg-(--bg-card) transition-colors disabled:opacity-40"
-              >
-                {tr.cancel}
-              </button>
-              <button
-                onClick={confirmDeleteMessage}
-                disabled={deletingMsg}
-                className="px-3 py-1.5 rounded-lg text-sm font-medium text-white bg-red-500/80 hover:bg-red-500 transition-colors disabled:opacity-50 flex items-center gap-2"
-              >
-                {deletingMsg ? (
-                  <>
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    {tr.deleting}
-                  </>
-                ) : (
-                  tr.delete
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
+        <ConfirmDialog
+          title={tr.deleteThisMessage}
+          description={tr.deleteThisMessageDesc}
+          confirmLabel={tr.delete}
+          cancelLabel={tr.cancel}
+          pendingLabel={tr.deleting}
+          pending={deletingMsg}
+          onConfirm={confirmDeleteMessage}
+          onCancel={() => setPendingDeleteMsgId(null)}
+        />
       )}
 
       {deleteMode && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4"
-          onClick={() => !deleting && setDeleteMode(null)}
-        >
-          <div
-            className="w-full max-w-md rounded-2xl border border-(--border) bg-(--bg-secondary) p-5 shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 className="text-base font-semibold text-(--text-primary)">
-              {deleteModalTitles[deleteMode]}
-            </h2>
-            <p className="mt-2 text-sm text-(--text-primary)/60">
-              {deleteModalDescs[deleteMode]}
-            </p>
-            <div className="mt-5 flex justify-end gap-2">
-              <button
-                onClick={() => setDeleteMode(null)}
-                disabled={deleting}
-                className="px-3 py-1.5 rounded-lg text-sm text-(--text-primary)/60 hover:bg-(--bg-card) transition-colors disabled:opacity-40"
-              >
-                {tr.cancel}
-              </button>
-              <button
-                onClick={confirmDelete}
-                disabled={deleting}
-                className="px-3 py-1.5 rounded-lg text-sm font-medium text-white bg-red-500/80 hover:bg-red-500 transition-colors disabled:opacity-50 flex items-center gap-2"
-              >
-                {deleting ? (
-                  <>
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    {tr.deleting}
-                  </>
-                ) : (
-                  tr.delete
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
+        <ConfirmDialog
+          title={deleteModalTitles[deleteMode]}
+          description={deleteModalDescs[deleteMode]}
+          confirmLabel={tr.delete}
+          cancelLabel={tr.cancel}
+          pendingLabel={tr.deleting}
+          pending={deleting}
+          onConfirm={confirmDelete}
+          onCancel={() => setDeleteMode(null)}
+        />
       )}
     </div>
   );

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Dialog } from "@/app/components/ui/Dialog";
 import { useLang } from "@/app/context/language";
 import { t } from "@/app/translation/translation";
 
@@ -25,43 +26,30 @@ const CreateFolderModal = ({ isOpen, onClose, onCreate }: Props) => {
   if (!isOpen) return null;
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4"
-      onClick={onClose}
-    >
-      <div
-        className="w-full max-w-sm rounded-2xl border border-(--border) bg-(--bg-primary) p-5 space-y-4"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <p className="text-sm font-semibold text-(--text-primary)">
-          {tr.newFolder}
-        </p>
-        <input
-          type="text"
-          value={newFolderName}
-          onChange={(e) => setNewFolderName(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && handleCreate()}
-          placeholder={tr.folderName}
-          autoFocus
-          className="w-full rounded-xl border border-(--border) bg-(--bg-primary) px-3 py-2 text-sm text-(--text-primary) placeholder:text-(--text-primary)/25 outline-none focus:border-(--text-primary)/20 transition-colors"
-        />
-        <div className="flex justify-end gap-2">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-xs font-semibold text-(--text-primary)/60 hover:bg-(--bg-card) rounded-xl transition-colors"
-          >
-            {tr.cancel}
-          </button>
-          <button
-            onClick={handleCreate}
-            disabled={!newFolderName.trim()}
-            className="px-4 py-2 text-xs font-semibold text-(--text-primary) bg-(--bg-card) hover:opacity-80 rounded-xl transition-colors disabled:opacity-30"
-          >
-            {tr.createFolder}
-          </button>
-        </div>
+    <Dialog title={tr.newFolder} onClose={onClose}>
+      <input
+        type="text"
+        value={newFolderName}
+        onChange={(e) => setNewFolderName(e.target.value)}
+        onKeyDown={(e) => e.key === "Enter" && handleCreate()}
+        placeholder={tr.folderName}
+        aria-label={tr.folderName}
+        autoFocus
+        className="field mt-4"
+      />
+      <div className="mt-5 flex justify-end gap-1">
+        <button onClick={onClose} className="btn btn-ghost">
+          {tr.cancel}
+        </button>
+        <button
+          onClick={handleCreate}
+          disabled={!newFolderName.trim()}
+          className="btn btn-primary"
+        >
+          {tr.createFolder}
+        </button>
       </div>
-    </div>
+    </Dialog>
   );
 };
 

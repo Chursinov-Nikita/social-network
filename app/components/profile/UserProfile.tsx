@@ -1,10 +1,11 @@
 "use client";
 
+import PageHeader from "@/app/components/shell/PageHeader";
+import Avatar from "@/app/components/ui/Avatar";
 import { useLang } from "@/app/context/language";
 import { t } from "@/app/translation/translation";
 import type { PublicProfile } from "@/app/types/profile";
 import { ChevronLeft } from "lucide-react";
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 
 const UserProfile = ({ user }: { user: PublicProfile }) => {
@@ -12,66 +13,53 @@ const UserProfile = ({ user }: { user: PublicProfile }) => {
   const tr = t[lang];
   const router = useRouter();
 
-  const initials = (user.name || "?")[0].toUpperCase();
+  const displayName = user.name || tr.noName;
 
   return (
-    <div className="min-h-screen bg-(--bg-primary) text-(--text-primary) antialiased">
-      <div className="mx-auto w-full max-w-2xl px-4 py-10">
-        <button
-          onClick={() => router.back()}
-          className="flex items-center gap-2 text-sm text-(--text-primary)/40 hover:text-(--text-primary) transition-colors mb-6"
-        >
-          <ChevronLeft className="w-4 h-4" />
-          {tr.back}
-        </button>
+    <>
+      <PageHeader
+        title={<span className="truncate">{displayName}</span>}
+        leading={
+          <button
+            onClick={() => router.back()}
+            aria-label={tr.back}
+            className="icon-btn -ml-2"
+          >
+            <ChevronLeft className="size-6" strokeWidth={1.75} />
+          </button>
+        }
+      />
 
-        <div className="rounded-2xl border border-(--border) bg-(--bg-secondary) p-6 space-y-6">
-          <div className="flex items-center gap-4">
-            <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl border border-(--border) bg-(--bg-card) text-xl font-semibold text-(--text-primary)/60 overflow-hidden">
-              {user.image ? (
-                <Image
-                  src={user.image}
-                  width={64}
-                  height={64}
-                  className="rounded-xl object-cover w-16 h-16"
-                  alt={user.name ?? ""}
-                />
-              ) : (
-                initials
-              )}
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-base font-semibold text-(--text-primary) truncate">
-                {user.name || tr.noName}
-              </p>
-              <p className="text-xs text-(--text-primary)/20 mt-1">
-                {tr.memberSince}{" "}
-                {new Date(user.createdAt).toLocaleDateString(lang, {
-                  month: "long",
-                  year: "numeric",
-                })}
-              </p>
-            </div>
-          </div>
+      <div className="mx-auto max-w-2xl space-y-2 py-2 sm:space-y-3 sm:px-4 sm:py-4">
+        <section className="panel flex flex-col items-center px-4 py-6 text-center">
+          <Avatar name={user.name} image={user.image} size={96} />
+          <p className="mt-3 max-w-full truncate text-xl font-medium">
+            {displayName}
+          </p>
+          <p className="mt-0.5 text-sm text-muted">
+            {tr.memberSince}{" "}
+            {new Date(user.createdAt).toLocaleDateString(lang, {
+              month: "long",
+              year: "numeric",
+            })}
+          </p>
+        </section>
 
-          <div className="grid grid-cols-2 divide-x divide-(--border) rounded-xl border border-(--border)">
-            {[
-              { value: user._count.reels, label: tr.reels },
-              { value: user._count.posts, label: tr.posts },
-            ].map(({ value, label }) => (
-              <div key={label} className="p-3 text-center">
-                <p className="tabular-nums text-lg font-semibold text-(--text-primary)">
-                  {value}
-                </p>
-                <p className="mt-0.5 text-[9px] font-medium uppercase tracking-wider text-(--text-primary)/30">
-                  {label}
-                </p>
-              </div>
-            ))}
-          </div>
-        </div>
+        <section className="panel grid grid-cols-2 divide-x divide-line py-3">
+          {[
+            { value: user._count.reels, label: tr.reels },
+            { value: user._count.posts, label: tr.posts },
+          ].map(({ value, label }) => (
+            <div key={label} className="text-center">
+              <p className="text-xl font-medium tabular-nums">{value}</p>
+              <p className="text-sm text-muted first-letter:uppercase">
+                {label}
+              </p>
+            </div>
+          ))}
+        </section>
       </div>
-    </div>
+    </>
   );
 };
 

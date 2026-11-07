@@ -1,15 +1,18 @@
 import type { Metadata } from "next";
-import { Nunito } from "next/font/google";
+import { Roboto } from "next/font/google";
 import "./globals.css";
-import Header from "./components/header/Header";
+import AppShell from "./components/shell/AppShell";
 import { LanguageProvider } from "./context/language";
 import { SessionProvider } from "next-auth/react";
 
-const nunito = Nunito({
+const roboto = Roboto({
   subsets: ["latin", "cyrillic"],
-  weight: ["400", "500", "600", "700"],
+  weight: ["400", "500", "700"],
   display: "swap",
+  variable: "--font-roboto",
 });
+
+const RESTORE_THEME = `try{if(localStorage.getItem("theme")==="light")document.documentElement.classList.remove("dark")}catch(e){}`;
 
 export const metadata: Metadata = {
   title: "NEBL",
@@ -24,12 +27,19 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark" suppressHydrationWarning>
-      <body className={`${nunito.className} antialiased`}>
+    <html
+      lang="en"
+      className={`dark ${roboto.variable}`}
+      suppressHydrationWarning
+    >
+      <body className="font-sans antialiased">
+        <script
+          suppressHydrationWarning
+          dangerouslySetInnerHTML={{ __html: RESTORE_THEME }}
+        />
         <SessionProvider>
           <LanguageProvider>
-            <Header />
-            <main className="pt-15 bg-(--bg-primary)">{children}</main>
+            <AppShell>{children}</AppShell>
           </LanguageProvider>
         </SessionProvider>
       </body>
